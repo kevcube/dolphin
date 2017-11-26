@@ -39,6 +39,7 @@
 
 #include "Core/ARDecrypt.h"
 #include "Core/ConfigManager.h"
+#include "Core/Host.h"
 #include "Core/PowerPC/PowerPC.h"
 #include <Windows.h>
 
@@ -946,7 +947,6 @@ void RunAllActive()
   // are only atomic ops unless contested. It should be rare for this to
   // be contested.
 
-
   static POINT prevP = { 0 };
   static float yStart = 0;
   POINT p;
@@ -967,7 +967,7 @@ void RunAllActive()
         firstRun = true;
       }
     }
-    if (GetAsyncKeyState(VK_SPACE))
+    if (Host_RendererHasFocus())
     {
       dx = p.x - 960;
       dy = p.y - 540;
