@@ -40,6 +40,7 @@
 #include "Core/ARDecrypt.h"
 #include "Core/ConfigManager.h"
 #include "Core/PowerPC/PowerPC.h"
+#include <Windows.h>
 
 namespace ActionReplay
 {
@@ -944,6 +945,114 @@ void RunAllActive()
   // If the mutex is idle then acquiring it should be cheap, fast mutexes
   // are only atomic ops unless contested. It should be rare for this to
   // be contested.
+
+
+  static POINT prevP = { 0 };
+  static float yStart = 0;
+  POINT p;
+  int dx, dy;
+
+  GetCursorPos(&p);
+  static bool firstRun = true;
+
+  if (true)
+  {
+    if (GetAsyncKeyState(VK_DELETE))
+    {
+      if (firstRun)
+      {
+        u32 newInstruction = 0xec010072;
+        PowerPC::HostWrite_U32(newInstruction, 0x80098ee4);
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80098ee4);
+        firstRun = true;
+      }
+    }
+    if (GetAsyncKeyState(VK_SPACE))
+    {
+      dx = p.x - 960;
+      dy = p.y - 540;
+      SetCursorPos(960, 540);
+    }
+    else
+    {
+      dx = p.x - prevP.x;
+      dy = p.y - prevP.y;
+    }
+
+    float dfx = dx * -10.f;
+    yStart += (float)dy / -1000.f;
+    yStart = (yStart > 1.22f ? 1.22f : (yStart < -1.22f ? -1.22f : yStart));
+
+    u32 mem, mem2, mem3 = 0;
+    memcpy(&mem, &dfx, 4);
+    memcpy(&mem2, &yStart, 4);
+    PowerPC::HostWrite_U32(mem3, 0x804D3D74);
+    PowerPC::HostWrite_U32(mem2, 0x804D3FFC);
+    PowerPC::HostWrite_U32(mem2, 0x804D4000);
+    PowerPC::HostWrite_U32(mem, 0x804d3d38);
+
+  }
+  prevP = p;
+
+
+
+
+
+
+  //PRIME 2
+
+  //  static POINT prevP = { 0 };
+  //  static float yStart = 0;
+  //  POINT p;
+  //  int dx, dy;
+  //
+  //  GetCursorPos(&p);
+  //  static bool firstRun = true;
+  //
+  //  if (true)
+  //  {
+  //    if (GetAsyncKeyState(VK_NUMLOCK))
+  //    {
+  //      if (firstRun)
+  //      {
+  //        u32 newInstruction1 = 0xc0430184;
+  //        u32 newInstruction2 = 0x60000000;
+  //        PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8);
+  //        PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c);
+  //        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
+  //        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
+  //        firstRun = false;
+  //      }
+  //    }
+  //    if (GetAsyncKeyState(VK_SPACE))
+  //    {
+  //      dx = p.x - 960;
+  //      dy = p.y - 540;
+  //      SetCursorPos(960, 540);
+  //    }
+  //    else
+  //    {
+  //      dx = p.x - prevP.x;
+  //      dy = p.y - prevP.y;
+  //    }
+  //
+  //    float dfx = dx * -10.f;
+  //    yStart += (float)dy / -1000.f;
+  //    yStart = (yStart > 1.04f ? 1.04f : (yStart < -1.04 ? -1.04f : yStart));
+  //
+  //    u32 mem, mem2;
+  //    memcpy(&mem, &dfx, 4);
+  //    memcpy(&mem2, &yStart, 4);
+  //    PowerPC::HostWrite_U32(mem2, 0x80bd43f0);
+  ////    PowerPC::HostWrite_U32(mem2, 0x80bd43f4);
+  //    PowerPC::HostWrite_U32(mem, 0x80bd3f78);
+  //
+  //  }
+  //  prevP = p;
+
+
+
+
   std::lock_guard<std::mutex> guard(s_lock);
   s_active_codes.erase(std::remove_if(s_active_codes.begin(), s_active_codes.end(),
                                       [](const ARCode& code) {
