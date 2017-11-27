@@ -93,6 +93,12 @@ public:
 #endif
   }
 
+  //bad but quick solution
+  CRenderFrame* GetRenderFrame()
+  {
+    return m_render_frame;
+  }
+
   // These have to be public
   CCodeWindow* m_code_window = nullptr;
   NetPlaySetupFrame* m_netplay_setup_frame = nullptr;
@@ -182,6 +188,7 @@ private:
 #ifdef __WXGTK__
   std::recursive_mutex m_keystate_lock;
 #endif
+
 
   void BindEvents();
   void BindMenuBarEvents();
