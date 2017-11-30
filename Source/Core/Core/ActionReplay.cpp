@@ -945,13 +945,15 @@ void RunAllActive()
   if (!SConfig::GetInstance().bEnableCheats)
     return;
 
+
+#define clamp(min, max, v) ((v) > (max) ? (max) : ((v) < (min) ? (min) : (v)))
   // If the mutex is idle then acquiring it should be cheap, fast mutexes
   // are only atomic ops unless contested. It should be rare for this to
   // be contested.
 
 
   //METROID PRIME 1
-
+  /*
   //mouse location from previous call to RunAllActive, to be removed
   static POINT prevP = { 0 };
   static bool firstRun = true;
@@ -1012,8 +1014,6 @@ void RunAllActive()
     cursorLocked = false;
   }
 
-#define clamp(min, max, v) ((v) > (max) ? (max) : ((v) < (min) ? (min) : (v)))
-
   //these need to be tuned, i believe the horizontal turning rate is measured in radians per tick
   //so a good scalar could be something like vSensitivity =  (60 * hSensitivity), test it
   const float hSensitivity = 10.f;
@@ -1037,61 +1037,70 @@ void RunAllActive()
   //provide the speed to turn horizontally
   PowerPC::HostWrite_U32(horizontalSpeed, 0x804d3d38);
 
-
+  */
 
 
 
 
   //PRIME 2
 
-  //  static POINT prevP = { 0 };
-  //  static float yStart = 0;
-  //  POINT p;
-  //  int dx, dy;
-  //
-  //  GetCursorPos(&p);
-  //  static bool firstRun = true;
-  //
-  //  if (true)
-  //  {
-  //    if (GetAsyncKeyState(VK_NUMLOCK))
-  //    {
-  //      if (firstRun)
-  //      {
-  //        u32 newInstruction1 = 0xc0430184;
-  //        u32 newInstruction2 = 0x60000000;
-  //        PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8);
-  //        PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c);
-  //        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
-  //        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
-  //        firstRun = false;
-  //      }
-  //    }
-  //    if (GetAsyncKeyState(VK_SPACE))
-  //    {
-  //      dx = p.x - 960;
-  //      dy = p.y - 540;
-  //      SetCursorPos(960, 540);
-  //    }
-  //    else
-  //    {
-  //      dx = p.x - prevP.x;
-  //      dy = p.y - prevP.y;
-  //    }
-  //
-  //    float dfx = dx * -10.f;
-  //    yStart += (float)dy / -1000.f;
-  //    yStart = (yStart > 1.04f ? 1.04f : (yStart < -1.04 ? -1.04f : yStart));
-  //
-  //    u32 mem, mem2;
-  //    memcpy(&mem, &dfx, 4);
-  //    memcpy(&mem2, &yStart, 4);
-  //    PowerPC::HostWrite_U32(mem2, 0x80bd43f0);
-  ////    PowerPC::HostWrite_U32(mem2, 0x80bd43f4);
-  //    PowerPC::HostWrite_U32(mem, 0x80bd3f78);
-  //
-  //  }
-  //  prevP = p;
+  static float yAngle = 0;
+  static bool cursorLocked = false;
+  static bool firstRun = true;
+  POINT cursorPos;
+  int dx = 0, dy = 0;
+
+  GetCursorPos(&cursorPos);
+
+  if (GetAsyncKeyState(VK_DELETE))
+  {
+    if (firstRun)
+    {
+      u32 newInstruction1 = 0xc0430184;
+      u32 newInstruction2 = 0x60000000;
+      PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8);
+      PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c);
+      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
+      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
+      firstRun = false;
+    }
+  }
+  if (Host_RendererHasFocus())
+  {
+    int cursorX = cursorPos.x, cursorY = cursorPos.y;
+    wxRect clientArea;
+    Host_RenderScreenToClient(&cursorX, &cursorY);
+    Host_GetRendererClientRect(clientArea);
+    bool lButton = GetAsyncKeyState(VK_LBUTTON);
+    if ((cursorX >= 0 && cursorY >= 0 && lButton) ||
+      cursorLocked)
+    {
+      cursorLocked = true;
+      int cX = (clientArea.GetWidth() / 2) + clientArea.GetX();
+      int cY = (clientArea.GetHeight() / 2) + clientArea.GetY();
+      dx = cursorPos.x - cX;
+      dy = cursorPos.y - cY;
+      SetCursorPos(cX, cY);
+    }
+  }
+  else
+  {
+    cursorLocked = false;
+  }
+
+  const float hSensitivity = 10.f;
+  const float vSensitivity = 80.f * hSensitivity;
+
+  float dfx = dx * -hSensitivity;
+  yAngle += (float)dy / -vSensitivity;
+  yAngle = clamp(-1.04f, 1.04f, yAngle);
+
+  u32 horizontalSpeed, verticalAngle;
+  memcpy(&horizontalSpeed, &dfx, 4);
+  memcpy(&verticalAngle, &yAngle, 4);
+  PowerPC::HostWrite_U32(verticalAngle, 0x80bd43f0);
+  //    PowerPC::HostWrite_U32(mem2, 0x80bd43f4);
+  PowerPC::HostWrite_U32(horizontalSpeed, 0x80bd3f78);
 
 
 
