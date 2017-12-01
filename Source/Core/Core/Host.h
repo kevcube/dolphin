@@ -30,6 +30,7 @@ bool Host_RendererHasFocus();
 bool Host_RendererIsFullscreen();
 void Host_RenderScreenToClient(int* x, int* y);
 void Host_GetRendererClientRect(wxRect& rectOut);
+void* Host_GetRenderFrame();
 void Host_Message(int Id);
 void Host_NotifyMapLoaded();
 void Host_RefreshDSPDebuggerWindow();

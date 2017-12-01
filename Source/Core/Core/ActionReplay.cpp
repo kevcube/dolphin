@@ -44,6 +44,7 @@
 #include <Windows.h>
 
 #include "wx/window.h"
+#include "DolphinWX/Frame.h"
 
 namespace ActionReplay
 {
@@ -91,6 +92,7 @@ static std::atomic<bool> s_use_internal_log{false};
 // pointer to the code currently being run, (used by log messages that include the code name)
 static const ARCode* s_current_code = nullptr;
 static bool s_disable_logging = false;
+static bool s_window_focused = false;
 
 struct ARAddr
 {
@@ -940,18 +942,25 @@ static bool RunCodeLocked(const ARCode& arcode)
   return true;
 }
 
+void OnMouseClick(wxMouseEvent& event)
+{
+  s_window_focused = true;
+}
+
+#define RunCodeOnce(code) { static bool r = true; if(r) { r = false; code } }
+
 void RunAllActive()
 {
   if (!SConfig::GetInstance().bEnableCheats)
     return;
-
-
-#define clamp(min, max, v) ((v) > (max) ? (max) : ((v) < (min) ? (min) : (v)))
   // If the mutex is idle then acquiring it should be cheap, fast mutexes
   // are only atomic ops unless contested. It should be rare for this to
   // be contested.
 
+  //this really needs to move, find correct place to do window events
+  RunCodeOnce(((CRenderFrame*)Host_GetRenderFrame())->Bind(wxEVT_LEFT_DOWN, OnMouseClick););
 
+#define clamp(min, max, v) ((v) > (max) ? (max) : ((v) < (min) ? (min) : (v)))
   //METROID PRIME 1
   /*
   //mouse location from previous call to RunAllActive, to be removed
@@ -991,14 +1000,16 @@ void RunAllActive()
     }
   }
 
-  if (Host_RendererHasFocus())
+
+
+  if (s_window_focused || cursorLocked)
   {
+    s_window_focused = false;
     int cursorX = cursorPos.x, cursorY = cursorPos.y;
     wxRect clientArea;
     Host_RenderScreenToClient(&cursorX, &cursorY);
     Host_GetRendererClientRect(clientArea);
-    bool lButton = GetAsyncKeyState(VK_LBUTTON);
-    if ((cursorX >= 0 && cursorY >= 0 && lButton) ||
+    if ((cursorX >= 0 && cursorY >= 0) ||
       cursorLocked)
     {
       cursorLocked = true;
@@ -1009,7 +1020,7 @@ void RunAllActive()
       SetCursorPos(cX, cY);
     }
   }
-  else
+  if(!Host_RendererHasFocus())
   {
     cursorLocked = false;
   }
@@ -1043,67 +1054,67 @@ void RunAllActive()
 
 
   //PRIME 2
+  
+  //static float yAngle = 0;
+  //static bool cursorLocked = false;
+  //static bool firstRun = true;
+  //POINT cursorPos;
+  //int dx = 0, dy = 0;
 
-  static float yAngle = 0;
-  static bool cursorLocked = false;
-  static bool firstRun = true;
-  POINT cursorPos;
-  int dx = 0, dy = 0;
+  //GetCursorPos(&cursorPos);
 
-  GetCursorPos(&cursorPos);
+  //if (GetAsyncKeyState(VK_DELETE))
+  //{
+  //  if (firstRun)
+  //  {
+  //    u32 newInstruction1 = 0xc0430184;
+  //    u32 newInstruction2 = 0x60000000;
+  //    PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8);
+  //    PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c);
+  //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
+  //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
+  //    firstRun = false;
+  //  }
+  //}
+  //if (s_window_focused || cursorLocked)
+  //{
+  //  s_window_focused = false;
+  //  int cursorX = cursorPos.x, cursorY = cursorPos.y;
+  //  wxRect clientArea;
+  //  Host_RenderScreenToClient(&cursorX, &cursorY);
+  //  Host_GetRendererClientRect(clientArea);
+  //  if ((cursorX >= 0 && cursorY >= 0) ||
+  //    cursorLocked)
+  //  {
+  //    cursorLocked = true;
+  //    int cX = (clientArea.GetWidth() / 2) + clientArea.GetX();
+  //    int cY = (clientArea.GetHeight() / 2) + clientArea.GetY();
+  //    dx = cursorPos.x - cX;
+  //    dy = cursorPos.y - cY;
+  //    SetCursorPos(cX, cY);
+  //  }
+  //}
+  //if (!Host_RendererHasFocus())
+  //{
+  //  cursorLocked = false;
+  //}
 
-  if (GetAsyncKeyState(VK_DELETE))
-  {
-    if (firstRun)
-    {
-      u32 newInstruction1 = 0xc0430184;
-      u32 newInstruction2 = 0x60000000;
-      PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8);
-      PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c);
-      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
-      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
-      firstRun = false;
-    }
-  }
-  if (Host_RendererHasFocus())
-  {
-    int cursorX = cursorPos.x, cursorY = cursorPos.y;
-    wxRect clientArea;
-    Host_RenderScreenToClient(&cursorX, &cursorY);
-    Host_GetRendererClientRect(clientArea);
-    bool lButton = GetAsyncKeyState(VK_LBUTTON);
-    if ((cursorX >= 0 && cursorY >= 0 && lButton) ||
-      cursorLocked)
-    {
-      cursorLocked = true;
-      int cX = (clientArea.GetWidth() / 2) + clientArea.GetX();
-      int cY = (clientArea.GetHeight() / 2) + clientArea.GetY();
-      dx = cursorPos.x - cX;
-      dy = cursorPos.y - cY;
-      SetCursorPos(cX, cY);
-    }
-  }
-  else
-  {
-    cursorLocked = false;
-  }
+  //const float hSensitivity = 10.f;
+  //const float vSensitivity = 80.f * hSensitivity;
 
-  const float hSensitivity = 10.f;
-  const float vSensitivity = 80.f * hSensitivity;
+  //float dfx = dx * -hSensitivity;
+  //yAngle += (float)dy / -vSensitivity;
+  //yAngle = clamp(-1.04f, 1.04f, yAngle);
 
-  float dfx = dx * -hSensitivity;
-  yAngle += (float)dy / -vSensitivity;
-  yAngle = clamp(-1.04f, 1.04f, yAngle);
-
-  u32 horizontalSpeed, verticalAngle;
-  memcpy(&horizontalSpeed, &dfx, 4);
-  memcpy(&verticalAngle, &yAngle, 4);
-  PowerPC::HostWrite_U32(verticalAngle, 0x80bd43f0);
-  //    PowerPC::HostWrite_U32(mem2, 0x80bd43f4);
-  PowerPC::HostWrite_U32(horizontalSpeed, 0x80bd3f78);
+  //u32 horizontalSpeed, verticalAngle;
+  //memcpy(&horizontalSpeed, &dfx, 4);
+  //memcpy(&verticalAngle, &yAngle, 4);
+  //PowerPC::HostWrite_U32(verticalAngle, 0x80bd43f0);
+  ////    PowerPC::HostWrite_U32(mem2, 0x80bd43f4);
+  //PowerPC::HostWrite_U32(horizontalSpeed, 0x80bd3f78);
 
 
-
+  
 
   std::lock_guard<std::mutex> guard(s_lock);
   s_active_codes.erase(std::remove_if(s_active_codes.begin(), s_active_codes.end(),
