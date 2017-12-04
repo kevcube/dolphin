@@ -961,121 +961,47 @@ void RunAllActive()
   RunCodeOnce(((CRenderFrame*)Host_GetRenderFrame())->Bind(wxEVT_LEFT_DOWN, OnMouseClick););
 
 #define clamp(min, max, v) ((v) > (max) ? (max) : ((v) < (min) ? (min) : (v)))
-  //METROID PRIME 1
-  /*
-  //mouse location from previous call to RunAllActive, to be removed
-  static POINT prevP = { 0 };
-  static bool firstRun = true;
-
-  static bool cursorLocked = false;
-
-  //for vertical angle control, we need to send the actual direction to look
-  //i believe the angle is measured in radians, clamped ~[-1.22, 1.22]
-  static float yAngle = 0;
-
-  POINT cursorPos;
-  int dx = 0, dy = 0;
-
-  GetCursorPos(&cursorPos);
-
-  //TODO: can this can (and should) be refactored into a gecko code
-  //TODO: add the NOP to stop sloped turning
-  if (GetAsyncKeyState(VK_DELETE))
-  {
-    if (firstRun)
-    {
-      //instruction change:
-      //   ec000072     ->    ec010072
-      //fmuls f0,f0,f1 -> fmuls f0, f1, f1
-      //result f0 is (most likely) the vertical turn rate, the result is typically <0.001,
-      //the changed instruction makes it more like 100, so we can turn as fast as we need
-      u32 newInstruction = 0xec010072;
-
-      //address of the instruction is 80098ee4
-      PowerPC::HostWrite_U32(newInstruction, 0x80098ee4);
-
-      //need to tell dolphin to update it, not 100% sure why, i guess instructions are cached?
-      PowerPC::ScheduleInvalidateCacheThreadSafe(0x80098ee4);
-      firstRun = true;
-    }
-  }
-
-
-
-  if (s_window_focused || cursorLocked)
-  {
-    s_window_focused = false;
-    int cursorX = cursorPos.x, cursorY = cursorPos.y;
-    wxRect clientArea;
-    Host_RenderScreenToClient(&cursorX, &cursorY);
-    Host_GetRendererClientRect(clientArea);
-    if ((cursorX >= 0 && cursorY >= 0) ||
-      cursorLocked)
-    {
-      cursorLocked = true;
-      int cX = (clientArea.GetWidth() / 2) + clientArea.GetX();
-      int cY = (clientArea.GetHeight() / 2) + clientArea.GetY();
-      dx = cursorPos.x - cX;
-      dy = cursorPos.y - cY;
-      SetCursorPos(cX, cY);
-    }
-  }
-  if(!Host_RendererHasFocus())
-  {
-    cursorLocked = false;
-  }
-
-  //these need to be tuned, i believe the horizontal turning rate is measured in radians per tick
-  //so a good scalar could be something like vSensitivity =  (60 * hSensitivity), test it
-  const float hSensitivity = 10.f;
-  const float vSensitivity = 80.f * hSensitivity;
-
-  float dfx = dx * -hSensitivity;
-  yAngle += (float)dy / -vSensitivity;
-  yAngle = clamp(-1.22f, 1.22f, yAngle);
-
-  u32 horizontalSpeed, verticalAngle;
-  memcpy(&horizontalSpeed, &dfx, 4);
-  memcpy(&verticalAngle, &yAngle, 4);
-
-
-  //provide the destination vertical angle
-  PowerPC::HostWrite_U32(verticalAngle, 0x804D3FFC);
-
-  //i didn't investigate why, but this has to be 0
-  //it also has to do with horizontal turning, but is limited to a certain speed
-  PowerPC::HostWrite_U32(0, 0x804D3D74);
-  //provide the speed to turn horizontally
-  PowerPC::HostWrite_U32(horizontalSpeed, 0x804d3d38);
-
-  */
-
-
-
-
-  //PRIME 2
-  
-  //static float yAngle = 0;
-  //static bool cursorLocked = false;
+  ////METROID PRIME 1
+  //
+  ////mouse location from previous call to RunAllActive, to be removed
+  //static POINT prevP = { 0 };
   //static bool firstRun = true;
+
+  //static bool cursorLocked = false;
+
+  ////for vertical angle control, we need to send the actual direction to look
+  ////i believe the angle is measured in radians, clamped ~[-1.22, 1.22]
+  //static float yAngle = 0;
+
   //POINT cursorPos;
   //int dx = 0, dy = 0;
 
   //GetCursorPos(&cursorPos);
 
+  ////TODO: can this can (and should) be refactored into a gecko code
+  ////TODO: add the NOP to stop sloped turning
   //if (GetAsyncKeyState(VK_DELETE))
   //{
   //  if (firstRun)
   //  {
-  //    u32 newInstruction1 = 0xc0430184;
-  //    u32 newInstruction2 = 0x60000000;
-  //    PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8);
-  //    PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c);
-  //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
-  //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
-  //    firstRun = false;
+  //    //instruction change:
+  //    //   ec000072     ->    ec010072
+  //    //fmuls f0,f0,f1 -> fmuls f0, f1, f1
+  //    //result f0 is (most likely) the vertical turn rate, the result is typically <0.001,
+  //    //the changed instruction makes it more like 100, so we can turn as fast as we need
+  //    u32 newInstruction = 0xec010072;
+
+  //    //address of the instruction is 80098ee4
+  //    PowerPC::HostWrite_U32(newInstruction, 0x80098ee4);
+
+  //    //need to tell dolphin to update it, not 100% sure why, i guess instructions are cached?
+  //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80098ee4);
+  //    firstRun = true;
   //  }
   //}
+
+
+
   //if (s_window_focused || cursorLocked)
   //{
   //  s_window_focused = false;
@@ -1094,25 +1020,104 @@ void RunAllActive()
   //    SetCursorPos(cX, cY);
   //  }
   //}
-  //if (!Host_RendererHasFocus())
+  //if(!Host_RendererHasFocus())
   //{
   //  cursorLocked = false;
   //}
 
+  ////these need to be tuned, i believe the horizontal turning rate is measured in radians per tick
+  ////so a good scalar could be something like vSensitivity =  (60 * hSensitivity), test it
   //const float hSensitivity = 10.f;
   //const float vSensitivity = 80.f * hSensitivity;
 
   //float dfx = dx * -hSensitivity;
   //yAngle += (float)dy / -vSensitivity;
-  //yAngle = clamp(-1.04f, 1.04f, yAngle);
+  //yAngle = clamp(-1.22f, 1.22f, yAngle);
 
   //u32 horizontalSpeed, verticalAngle;
   //memcpy(&horizontalSpeed, &dfx, 4);
   //memcpy(&verticalAngle, &yAngle, 4);
-  //PowerPC::HostWrite_U32(verticalAngle, 0x80bd43f0);
-  ////    PowerPC::HostWrite_U32(mem2, 0x80bd43f4);
-  //PowerPC::HostWrite_U32(horizontalSpeed, 0x80bd3f78);
 
+
+  ////provide the destination vertical angle
+  //PowerPC::HostWrite_U32(verticalAngle, 0x804D3FFC);
+
+  ////i didn't investigate why, but this has to be 0
+  ////it also has to do with horizontal turning, but is limited to a certain speed
+  //PowerPC::HostWrite_U32(0, 0x804D3D74);
+  ////provide the speed to turn horizontally
+  //PowerPC::HostWrite_U32(horizontalSpeed, 0x804d3d38);
+
+
+
+
+
+
+  //PRIME 2
+
+
+  static float yAngle = 0;
+  static bool cursorLocked = false;
+  static bool firstRun = true;
+  POINT cursorPos;
+  int dx = 0, dy = 0;
+
+  GetCursorPos(&cursorPos);
+
+  if (GetAsyncKeyState(VK_DELETE))
+  {
+    if (firstRun)
+    {
+      u32 newInstruction1 = 0xc0430184;
+      u32 newInstruction2 = 0x60000000;
+      PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8);
+      PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c);
+      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
+      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
+      firstRun = false;
+    }
+  }
+  if (s_window_focused || cursorLocked)
+  {
+    s_window_focused = false;
+    int cursorX = cursorPos.x, cursorY = cursorPos.y;
+    wxRect clientArea;
+    Host_RenderScreenToClient(&cursorX, &cursorY);
+    Host_GetRendererClientRect(clientArea);
+    if ((cursorX >= 0 && cursorY >= 0) ||
+      cursorLocked)
+    {
+      cursorLocked = true;
+      int cX = (clientArea.GetWidth() / 2) + clientArea.GetX();
+      int cY = (clientArea.GetHeight() / 2) + clientArea.GetY();
+      dx = cursorPos.x - cX;
+      dy = cursorPos.y - cY;
+      SetCursorPos(cX, cY);
+    }
+  }
+  if (!Host_RendererHasFocus())
+  {
+    cursorLocked = false;
+  }
+
+  const float hSensitivity = 10.f;
+  const float vSensitivity = 80.f * hSensitivity;
+
+  float dfx = dx * -hSensitivity;
+  yAngle += (float)dy / -vSensitivity;
+  yAngle = clamp(-1.04f, 1.04f, yAngle);
+
+  u32 baseAddress = PowerPC::HostRead_U32(0x804e72e8 + 0x14f4);
+  //modify this, see if we can check game state or something somehow (what writes to baseAddress?)
+  if (baseAddress > 0x80000000 && baseAddress < 0x81800000)
+  {
+    u32 horizontalSpeed, verticalAngle;
+    memcpy(&horizontalSpeed, &dfx, 4);
+    memcpy(&verticalAngle, &yAngle, 4);
+    PowerPC::HostWrite_U32(verticalAngle, baseAddress + 0x5f0);
+    //    PowerPC::HostWrite_U32(mem2, 0x80bd43f4);
+    PowerPC::HostWrite_U32(horizontalSpeed, baseAddress + 0x178);
+  }
 
   
 
