@@ -1072,8 +1072,20 @@ void RunAllActive()
       u32 newInstruction2 = 0x60000000;
       PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8);
       PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c);
+      PowerPC::HostWrite_U32(newInstruction2, 0x80147f70);
+      PowerPC::HostWrite_U32(newInstruction2, 0x80147f98);
+      PowerPC::HostWrite_U32(newInstruction2, 0x80135b20);
+      PowerPC::HostWrite_U32(newInstruction2, 0x8008bb48);
+      PowerPC::HostWrite_U32(newInstruction2, 0x8008bb18);
+
+
       PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
       PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
+      PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f70);
+      PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f98);
+      PowerPC::ScheduleInvalidateCacheThreadSafe(0x80135b20);
+      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb48);
+      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb18);
       firstRun = false;
     }
   }
@@ -1105,7 +1117,7 @@ void RunAllActive()
 
   float dfx = dx * -hSensitivity;
   yAngle += (float)dy / -vSensitivity;
-  yAngle = clamp(-1.04f, 1.04f, yAngle);
+  yAngle = clamp(-1.4f, 1.4f, yAngle);
 
   u32 baseAddress = PowerPC::HostRead_U32(0x804e72e8 + 0x14f4);
   //modify this, see if we can check game state or something somehow (what writes to baseAddress?)
