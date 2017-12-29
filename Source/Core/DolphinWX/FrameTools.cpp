@@ -97,6 +97,8 @@
 #include "VideoCommon/VideoBackendBase.h"
 #include "VideoCommon/VideoConfig.h"
 
+#include "InputCommon\DInputMouseAbsolute.h"
+
 class InputConfig;
 class wxFrame;
 
@@ -762,8 +764,10 @@ void CFrame::StartGame(std::unique_ptr<BootParameters> boot)
     wxTheApp->Bind(wxEVT_MIDDLE_UP, &CFrame::OnMouse, this);
     wxTheApp->Bind(wxEVT_MOTION, &CFrame::OnMouse, this);
     m_render_parent->Bind(wxEVT_SIZE, &CFrame::OnRenderParentResize, this);
-
     m_render_parent->SetCursor(wxCURSOR_BLANK);
+
+    // MODIFICATION: bind a left-click event to tell custom input manager to lock the cursor
+    wxTheApp->Bind(wxEVT_LEFT_DOWN, &InputExternal::DInputMouse::OnWindowClick, &InputExternal::g_mouse_input);
   }
 }
 

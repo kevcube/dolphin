@@ -45,1103 +45,1103 @@
 
 #include "wx/window.h"
 #include "DolphinWX/Frame.h"
+#include "VideoCommon\OnScreenDisplay.h"
+#include "Core/HW/Wiimote.h"
+#include "Core/HW/WiimoteEmu/WiimoteEmu.h"
+#include "InputCommon/ControllerEmu/ControlGroup/ControlGroup.h"
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
+#include "InputCommon/ControllerInterface/Device.h"
+#include "InputCommon/DInputMouseAbsolute.h"
 
 namespace ActionReplay
 {
-enum
-{
-  // Zero Code Types
-  ZCODE_END = 0x00,
-  ZCODE_NORM = 0x02,
-  ZCODE_ROW = 0x03,
-  ZCODE_04 = 0x04,
 
-  // Conditional Codes
-  CONDTIONAL_EQUAL = 0x01,
-  CONDTIONAL_NOT_EQUAL = 0x02,
-  CONDTIONAL_LESS_THAN_SIGNED = 0x03,
-  CONDTIONAL_GREATER_THAN_SIGNED = 0x04,
-  CONDTIONAL_LESS_THAN_UNSIGNED = 0x05,
-  CONDTIONAL_GREATER_THAN_UNSIGNED = 0x06,
-  CONDTIONAL_AND = 0x07,  // bitwise AND
-
-  // Conditional Line Counts
-  CONDTIONAL_ONE_LINE = 0x00,
-  CONDTIONAL_TWO_LINES = 0x01,
-  CONDTIONAL_ALL_LINES_UNTIL = 0x02,
-  CONDTIONAL_ALL_LINES = 0x03,
-
-  // Data Types
-  DATATYPE_8BIT = 0x00,
-  DATATYPE_16BIT = 0x01,
-  DATATYPE_32BIT = 0x02,
-  DATATYPE_32BIT_FLOAT = 0x03,
-
-  // Normal Code 0 Subtypes
-  SUB_RAM_WRITE = 0x00,
-  SUB_WRITE_POINTER = 0x01,
-  SUB_ADD_CODE = 0x02,
-  SUB_MASTER_CODE = 0x03,
-};
-
-// General lock. Protects codes list and internal log.
-static std::mutex s_lock;
-static std::vector<ARCode> s_active_codes;
-static std::vector<std::string> s_internal_log;
-static std::atomic<bool> s_use_internal_log{false};
-// pointer to the code currently being run, (used by log messages that include the code name)
-static const ARCode* s_current_code = nullptr;
-static bool s_disable_logging = false;
-static bool s_window_focused = false;
-
-struct ARAddr
-{
-  union
+#define clamp(min, max, v) ((v) > (max) ? (max) : ((v) < (min) ? (min) : (v)))
+  //  turning rate horizontal for Prime 1 is approximately this (in rad/sec)
+#define TURNRATE_RATIO 0.00498665500569808449206349206349f
+  enum
   {
-    u32 address;
-    struct
-    {
-      u32 gcaddr : 25;
-      u32 size : 2;
-      u32 type : 3;
-      u32 subtype : 2;
-    };
+    // Zero Code Types
+    ZCODE_END = 0x00,
+    ZCODE_NORM = 0x02,
+    ZCODE_ROW = 0x03,
+    ZCODE_04 = 0x04,
+
+    // Conditional Codes
+    CONDTIONAL_EQUAL = 0x01,
+    CONDTIONAL_NOT_EQUAL = 0x02,
+    CONDTIONAL_LESS_THAN_SIGNED = 0x03,
+    CONDTIONAL_GREATER_THAN_SIGNED = 0x04,
+    CONDTIONAL_LESS_THAN_UNSIGNED = 0x05,
+    CONDTIONAL_GREATER_THAN_UNSIGNED = 0x06,
+    CONDTIONAL_AND = 0x07,  // bitwise AND
+
+    // Conditional Line Counts
+    CONDTIONAL_ONE_LINE = 0x00,
+    CONDTIONAL_TWO_LINES = 0x01,
+    CONDTIONAL_ALL_LINES_UNTIL = 0x02,
+    CONDTIONAL_ALL_LINES = 0x03,
+
+    // Data Types
+    DATATYPE_8BIT = 0x00,
+    DATATYPE_16BIT = 0x01,
+    DATATYPE_32BIT = 0x02,
+    DATATYPE_32BIT_FLOAT = 0x03,
+
+    // Normal Code 0 Subtypes
+    SUB_RAM_WRITE = 0x00,
+    SUB_WRITE_POINTER = 0x01,
+    SUB_ADD_CODE = 0x02,
+    SUB_MASTER_CODE = 0x03,
   };
 
-  ARAddr(const u32 addr) : address(addr) {}
-  u32 GCAddress() const { return gcaddr | 0x80000000; }
-  operator u32() const { return address; }
-};
+  // General lock. Protects codes list and internal log.
+  static std::mutex s_lock;
+  static std::vector<ARCode> s_active_codes;
+  static std::vector<std::string> s_internal_log;
+  static std::atomic<bool> s_use_internal_log{ false };
+  // pointer to the code currently being run, (used by log messages that include the code name)
+  static const ARCode* s_current_code = nullptr;
+  static bool s_disable_logging = false;
+  static bool s_window_focused = false;
+  static bool s_cursor_locked = false;
 
-// ----------------------
-// AR Remote Functions
-void ApplyCodes(const std::vector<ARCode>& codes)
-{
-  if (!SConfig::GetInstance().bEnableCheats)
-    return;
-
-  std::lock_guard<std::mutex> guard(s_lock);
-  s_disable_logging = false;
-  s_active_codes.clear();
-  std::copy_if(codes.begin(), codes.end(), std::back_inserter(s_active_codes),
-               [](const ARCode& code) { return code.active; });
-  s_active_codes.shrink_to_fit();
-}
-
-void AddCode(ARCode code)
-{
-  if (!SConfig::GetInstance().bEnableCheats)
-    return;
-
-  if (code.active)
+  struct ARAddr
   {
+    union
+    {
+      u32 address;
+      struct
+      {
+        u32 gcaddr : 25;
+        u32 size : 2;
+        u32 type : 3;
+        u32 subtype : 2;
+      };
+    };
+
+    ARAddr(const u32 addr) : address(addr) {}
+    u32 GCAddress() const { return gcaddr | 0x80000000; }
+    operator u32() const { return address; }
+  };
+
+  // ----------------------
+  // AR Remote Functions
+  void ApplyCodes(const std::vector<ARCode>& codes)
+  {
+    if (!SConfig::GetInstance().bEnableCheats)
+      return;
+
     std::lock_guard<std::mutex> guard(s_lock);
     s_disable_logging = false;
-    s_active_codes.emplace_back(std::move(code));
+    s_active_codes.clear();
+    std::copy_if(codes.begin(), codes.end(), std::back_inserter(s_active_codes),
+      [](const ARCode& code) { return code.active; });
+    s_active_codes.shrink_to_fit();
   }
-}
 
-void LoadAndApplyCodes(const IniFile& global_ini, const IniFile& local_ini)
-{
-  ApplyCodes(LoadCodes(global_ini, local_ini));
-}
-
-// Parses the Action Replay section of a game ini file.
-std::vector<ARCode> LoadCodes(const IniFile& global_ini, const IniFile& local_ini)
-{
-  std::vector<ARCode> codes;
-
-  std::unordered_set<std::string> enabled_names;
+  void AddCode(ARCode code)
   {
-    std::vector<std::string> enabled_lines;
-    local_ini.GetLines("ActionReplay_Enabled", &enabled_lines);
-    for (const std::string& line : enabled_lines)
+    if (!SConfig::GetInstance().bEnableCheats)
+      return;
+
+    if (code.active)
     {
-      if (line.size() != 0 && line[0] == '$')
-      {
-        std::string name = line.substr(1, line.size() - 1);
-        enabled_names.insert(name);
-      }
+      std::lock_guard<std::mutex> guard(s_lock);
+      s_disable_logging = false;
+      s_active_codes.emplace_back(std::move(code));
     }
   }
 
-  const IniFile* inis[2] = {&global_ini, &local_ini};
-  for (const IniFile* ini : inis)
+  void LoadAndApplyCodes(const IniFile& global_ini, const IniFile& local_ini)
   {
-    std::vector<std::string> lines;
-    std::vector<std::string> encrypted_lines;
-    ARCode current_code;
+    ApplyCodes(LoadCodes(global_ini, local_ini));
+  }
 
-    ini->GetLines("ActionReplay", &lines);
+  // Parses the Action Replay section of a game ini file.
+  std::vector<ARCode> LoadCodes(const IniFile& global_ini, const IniFile& local_ini)
+  {
+    std::vector<ARCode> codes;
 
-    for (const std::string& line : lines)
+    std::unordered_set<std::string> enabled_names;
     {
-      if (line.empty())
+      std::vector<std::string> enabled_lines;
+      local_ini.GetLines("ActionReplay_Enabled", &enabled_lines);
+      for (const std::string& line : enabled_lines)
       {
-        continue;
-      }
-
-      // Check if the line is a name of the code
-      if (line[0] == '$')
-      {
-        if (current_code.ops.size())
+        if (line.size() != 0 && line[0] == '$')
         {
-          codes.push_back(current_code);
-          current_code.ops.clear();
+          std::string name = line.substr(1, line.size() - 1);
+          enabled_names.insert(name);
         }
-        if (encrypted_lines.size())
+      }
+    }
+
+    const IniFile* inis[2] = { &global_ini, &local_ini };
+    for (const IniFile* ini : inis)
+    {
+      std::vector<std::string> lines;
+      std::vector<std::string> encrypted_lines;
+      ARCode current_code;
+
+      ini->GetLines("ActionReplay", &lines);
+
+      for (const std::string& line : lines)
+      {
+        if (line.empty())
         {
-          DecryptARCode(encrypted_lines, &current_code.ops);
-          codes.push_back(current_code);
-          current_code.ops.clear();
-          encrypted_lines.clear();
+          continue;
         }
 
-        current_code.name = line.substr(1, line.size() - 1);
-        current_code.active = enabled_names.find(current_code.name) != enabled_names.end();
-        current_code.user_defined = (ini == &local_ini);
-      }
-      else
-      {
-        std::vector<std::string> pieces = SplitString(line, ' ');
-
-        // Check if the AR code is decrypted
-        if (pieces.size() == 2 && pieces[0].size() == 8 && pieces[1].size() == 8)
+        // Check if the line is a name of the code
+        if (line[0] == '$')
         {
-          AREntry op;
-          bool success_addr = TryParse(std::string("0x") + pieces[0], &op.cmd_addr);
-          bool success_val = TryParse(std::string("0x") + pieces[1], &op.value);
-
-          if (success_addr && success_val)
+          if (current_code.ops.size())
           {
-            current_code.ops.push_back(op);
+            codes.push_back(current_code);
+            current_code.ops.clear();
           }
-          else
+          if (encrypted_lines.size())
           {
-            PanicAlertT("Action Replay Error: invalid AR code line: %s", line.c_str());
-
-            if (!success_addr)
-              PanicAlertT("The address is invalid");
-
-            if (!success_val)
-              PanicAlertT("The value is invalid");
+            DecryptARCode(encrypted_lines, &current_code.ops);
+            codes.push_back(current_code);
+            current_code.ops.clear();
+            encrypted_lines.clear();
           }
+
+          current_code.name = line.substr(1, line.size() - 1);
+          current_code.active = enabled_names.find(current_code.name) != enabled_names.end();
+          current_code.user_defined = (ini == &local_ini);
         }
         else
         {
-          pieces = SplitString(line, '-');
-          if (pieces.size() == 3 && pieces[0].size() == 4 && pieces[1].size() == 4 &&
-              pieces[2].size() == 5)
+          std::vector<std::string> pieces = SplitString(line, ' ');
+
+          // Check if the AR code is decrypted
+          if (pieces.size() == 2 && pieces[0].size() == 8 && pieces[1].size() == 8)
           {
-            // Encrypted AR code
-            // Decryption is done in "blocks", so we must push blocks into a vector,
-            // then send to decrypt when a new block is encountered, or if it's the last block.
-            encrypted_lines.emplace_back(pieces[0] + pieces[1] + pieces[2]);
+            AREntry op;
+            bool success_addr = TryParse(std::string("0x") + pieces[0], &op.cmd_addr);
+            bool success_val = TryParse(std::string("0x") + pieces[1], &op.value);
+
+            if (success_addr && success_val)
+            {
+              current_code.ops.push_back(op);
+            }
+            else
+            {
+              PanicAlertT("Action Replay Error: invalid AR code line: %s", line.c_str());
+
+              if (!success_addr)
+                PanicAlertT("The address is invalid");
+
+              if (!success_val)
+                PanicAlertT("The value is invalid");
+            }
+          }
+          else
+          {
+            pieces = SplitString(line, '-');
+            if (pieces.size() == 3 && pieces[0].size() == 4 && pieces[1].size() == 4 &&
+              pieces[2].size() == 5)
+            {
+              // Encrypted AR code
+              // Decryption is done in "blocks", so we must push blocks into a vector,
+              // then send to decrypt when a new block is encountered, or if it's the last block.
+              encrypted_lines.emplace_back(pieces[0] + pieces[1] + pieces[2]);
+            }
           }
         }
       }
-    }
 
-    // Handle the last code correctly.
-    if (current_code.ops.size())
-    {
-      codes.push_back(current_code);
-    }
-    if (encrypted_lines.size())
-    {
-      DecryptARCode(encrypted_lines, &current_code.ops);
-      codes.push_back(current_code);
-    }
-  }
-
-  return codes;
-}
-
-void SaveCodes(IniFile* local_ini, const std::vector<ARCode>& codes)
-{
-  std::vector<std::string> lines;
-  std::vector<std::string> enabled_lines;
-  for (const ActionReplay::ARCode& code : codes)
-  {
-    if (code.active)
-      enabled_lines.emplace_back("$" + code.name);
-
-    if (code.user_defined)
-    {
-      lines.emplace_back("$" + code.name);
-      for (const ActionReplay::AREntry& op : code.ops)
+      // Handle the last code correctly.
+      if (current_code.ops.size())
       {
-        lines.emplace_back(StringFromFormat("%08X %08X", op.cmd_addr, op.value));
+        codes.push_back(current_code);
+      }
+      if (encrypted_lines.size())
+      {
+        DecryptARCode(encrypted_lines, &current_code.ops);
+        codes.push_back(current_code);
       }
     }
+
+    return codes;
   }
-  local_ini->SetLines("ActionReplay_Enabled", enabled_lines);
-  local_ini->SetLines("ActionReplay", lines);
-}
 
-static void LogInfo(const char* format, ...)
-{
-  if (s_disable_logging)
-    return;
-  bool use_internal_log = s_use_internal_log.load(std::memory_order_relaxed);
-  if (MAX_LOGLEVEL < LogTypes::LINFO && !use_internal_log)
-    return;
-
-  va_list args;
-  va_start(args, format);
-  std::string text = StringFromFormatV(format, args);
-  va_end(args);
-  INFO_LOG(ACTIONREPLAY, "%s", text.c_str());
-
-  if (use_internal_log)
+  void SaveCodes(IniFile* local_ini, const std::vector<ARCode>& codes)
   {
-    text += '\n';
-    s_internal_log.emplace_back(std::move(text));
-  }
-}
-
-void EnableSelfLogging(bool enable)
-{
-  s_use_internal_log.store(enable, std::memory_order_relaxed);
-}
-
-std::vector<std::string> GetSelfLog()
-{
-  std::lock_guard<std::mutex> guard(s_lock);
-  return s_internal_log;
-}
-
-void ClearSelfLog()
-{
-  std::lock_guard<std::mutex> guard(s_lock);
-  s_internal_log.clear();
-}
-
-bool IsSelfLogging()
-{
-  return s_use_internal_log.load(std::memory_order_relaxed);
-}
-
-// ----------------------
-// Code Functions
-static bool Subtype_RamWriteAndFill(const ARAddr& addr, const u32 data)
-{
-  const u32 new_addr = addr.GCAddress();
-
-  LogInfo("Hardware Address: %08x", new_addr);
-  LogInfo("Size: %08x", addr.size);
-
-  switch (addr.size)
-  {
-  case DATATYPE_8BIT:
-  {
-    LogInfo("8-bit Write");
-    LogInfo("--------");
-    u32 repeat = data >> 8;
-    for (u32 i = 0; i <= repeat; ++i)
+    std::vector<std::string> lines;
+    std::vector<std::string> enabled_lines;
+    for (const ActionReplay::ARCode& code : codes)
     {
-      PowerPC::HostWrite_U8(data & 0xFF, new_addr + i);
-      LogInfo("Wrote %08x to address %08x", data & 0xFF, new_addr + i);
-    }
-    LogInfo("--------");
-    break;
-  }
+      if (code.active)
+        enabled_lines.emplace_back("$" + code.name);
 
-  case DATATYPE_16BIT:
-  {
-    LogInfo("16-bit Write");
-    LogInfo("--------");
-    u32 repeat = data >> 16;
-    for (u32 i = 0; i <= repeat; ++i)
-    {
-      PowerPC::HostWrite_U16(data & 0xFFFF, new_addr + i * 2);
-      LogInfo("Wrote %08x to address %08x", data & 0xFFFF, new_addr + i * 2);
-    }
-    LogInfo("--------");
-    break;
-  }
-
-  case DATATYPE_32BIT_FLOAT:
-  case DATATYPE_32BIT:  // Dword write
-    LogInfo("32-bit Write");
-    LogInfo("--------");
-    PowerPC::HostWrite_U32(data, new_addr);
-    LogInfo("Wrote %08x to address %08x", data, new_addr);
-    LogInfo("--------");
-    break;
-
-  default:
-    LogInfo("Bad Size");
-    PanicAlertT("Action Replay Error: Invalid size "
-                "(%08x : address = %08x) in Ram Write And Fill (%s)",
-                addr.size, addr.gcaddr, s_current_code->name.c_str());
-    return false;
-  }
-
-  return true;
-}
-
-static bool Subtype_WriteToPointer(const ARAddr& addr, const u32 data)
-{
-  const u32 new_addr = addr.GCAddress();
-  const u32 ptr = PowerPC::HostRead_U32(new_addr);
-
-  LogInfo("Hardware Address: %08x", new_addr);
-  LogInfo("Size: %08x", addr.size);
-
-  switch (addr.size)
-  {
-  case DATATYPE_8BIT:
-  {
-    LogInfo("Write 8-bit to pointer");
-    LogInfo("--------");
-    const u8 thebyte = data & 0xFF;
-    const u32 offset = data >> 8;
-    LogInfo("Pointer: %08x", ptr);
-    LogInfo("Byte: %08x", thebyte);
-    LogInfo("Offset: %08x", offset);
-    PowerPC::HostWrite_U8(thebyte, ptr + offset);
-    LogInfo("Wrote %08x to address %08x", thebyte, ptr + offset);
-    LogInfo("--------");
-    break;
-  }
-
-  case DATATYPE_16BIT:
-  {
-    LogInfo("Write 16-bit to pointer");
-    LogInfo("--------");
-    const u16 theshort = data & 0xFFFF;
-    const u32 offset = (data >> 16) << 1;
-    LogInfo("Pointer: %08x", ptr);
-    LogInfo("Byte: %08x", theshort);
-    LogInfo("Offset: %08x", offset);
-    PowerPC::HostWrite_U16(theshort, ptr + offset);
-    LogInfo("Wrote %08x to address %08x", theshort, ptr + offset);
-    LogInfo("--------");
-    break;
-  }
-
-  case DATATYPE_32BIT_FLOAT:
-  case DATATYPE_32BIT:
-    LogInfo("Write 32-bit to pointer");
-    LogInfo("--------");
-    PowerPC::HostWrite_U32(data, ptr);
-    LogInfo("Wrote %08x to address %08x", data, ptr);
-    LogInfo("--------");
-    break;
-
-  default:
-    LogInfo("Bad Size");
-    PanicAlertT("Action Replay Error: Invalid size "
-                "(%08x : address = %08x) in Write To Pointer (%s)",
-                addr.size, addr.gcaddr, s_current_code->name.c_str());
-    return false;
-  }
-  return true;
-}
-
-static bool Subtype_AddCode(const ARAddr& addr, const u32 data)
-{
-  // Used to increment/decrement a value in memory
-  const u32 new_addr = addr.GCAddress();
-
-  LogInfo("Hardware Address: %08x", new_addr);
-  LogInfo("Size: %08x", addr.size);
-
-  switch (addr.size)
-  {
-  case DATATYPE_8BIT:
-    LogInfo("8-bit Add");
-    LogInfo("--------");
-    PowerPC::HostWrite_U8(PowerPC::HostRead_U8(new_addr) + data, new_addr);
-    LogInfo("Wrote %02x to address %08x", PowerPC::HostRead_U8(new_addr), new_addr);
-    LogInfo("--------");
-    break;
-
-  case DATATYPE_16BIT:
-    LogInfo("16-bit Add");
-    LogInfo("--------");
-    PowerPC::HostWrite_U16(PowerPC::HostRead_U16(new_addr) + data, new_addr);
-    LogInfo("Wrote %04x to address %08x", PowerPC::HostRead_U16(new_addr), new_addr);
-    LogInfo("--------");
-    break;
-
-  case DATATYPE_32BIT:
-    LogInfo("32-bit Add");
-    LogInfo("--------");
-    PowerPC::HostWrite_U32(PowerPC::HostRead_U32(new_addr) + data, new_addr);
-    LogInfo("Wrote %08x to address %08x", PowerPC::HostRead_U32(new_addr), new_addr);
-    LogInfo("--------");
-    break;
-
-  case DATATYPE_32BIT_FLOAT:
-  {
-    LogInfo("32-bit floating Add");
-    LogInfo("--------");
-
-    const u32 read = PowerPC::HostRead_U32(new_addr);
-    const float read_float = reinterpret_cast<const float&>(read);
-    // data contains an (unsigned?) integer value
-    const float fread = read_float + static_cast<float>(data);
-    const u32 newval = reinterpret_cast<const u32&>(fread);
-    PowerPC::HostWrite_U32(newval, new_addr);
-    LogInfo("Old Value %08x", read);
-    LogInfo("Increment %08x", data);
-    LogInfo("New value %08x", newval);
-    LogInfo("--------");
-    break;
-  }
-
-  default:
-    LogInfo("Bad Size");
-    PanicAlertT("Action Replay Error: Invalid size "
-                "(%08x : address = %08x) in Add Code (%s)",
-                addr.size, addr.gcaddr, s_current_code->name.c_str());
-    return false;
-  }
-  return true;
-}
-
-static bool Subtype_MasterCodeAndWriteToCCXXXXXX(const ARAddr& addr, const u32 data)
-{
-  // code not yet implemented - TODO
-  // u32 new_addr = (addr & 0x01FFFFFF) | 0x80000000;
-  // u8  mcode_type = (data & 0xFF0000) >> 16;
-  // u8  mcode_count = (data & 0xFF00) >> 8;
-  // u8  mcode_number = data & 0xFF;
-  PanicAlertT("Action Replay Error: Master Code and Write To CCXXXXXX not implemented (%s)\n"
-              "Master codes are not needed. Do not use master codes.",
-              s_current_code->name.c_str());
-  return false;
-}
-
-// This needs more testing
-static bool ZeroCode_FillAndSlide(const u32 val_last, const ARAddr& addr, const u32 data)
-{
-  const u32 new_addr = ARAddr(val_last).GCAddress();
-  const u8 size = ARAddr(val_last).size;
-
-  const s16 addr_incr = static_cast<s16>(data & 0xFFFF);
-  const s8 val_incr = static_cast<s8>(data >> 24);
-  const u8 write_num = static_cast<u8>((data & 0xFF0000) >> 16);
-
-  u32 val = addr;
-  u32 curr_addr = new_addr;
-
-  LogInfo("Current Hardware Address: %08x", new_addr);
-  LogInfo("Size: %08x", addr.size);
-  LogInfo("Write Num: %08x", write_num);
-  LogInfo("Address Increment: %i", addr_incr);
-  LogInfo("Value Increment: %i", val_incr);
-
-  switch (size)
-  {
-  case DATATYPE_8BIT:
-    LogInfo("8-bit Write");
-    LogInfo("--------");
-    for (int i = 0; i < write_num; ++i)
-    {
-      PowerPC::HostWrite_U8(val & 0xFF, curr_addr);
-      curr_addr += addr_incr;
-      val += val_incr;
-      LogInfo("Write %08x to address %08x", val & 0xFF, curr_addr);
-
-      LogInfo("Value Update: %08x", val);
-      LogInfo("Current Hardware Address Update: %08x", curr_addr);
-    }
-    LogInfo("--------");
-    break;
-
-  case DATATYPE_16BIT:
-    LogInfo("16-bit Write");
-    LogInfo("--------");
-    for (int i = 0; i < write_num; ++i)
-    {
-      PowerPC::HostWrite_U16(val & 0xFFFF, curr_addr);
-      LogInfo("Write %08x to address %08x", val & 0xFFFF, curr_addr);
-      curr_addr += addr_incr * 2;
-      val += val_incr;
-      LogInfo("Value Update: %08x", val);
-      LogInfo("Current Hardware Address Update: %08x", curr_addr);
-    }
-    LogInfo("--------");
-    break;
-
-  case DATATYPE_32BIT:
-    LogInfo("32-bit Write");
-    LogInfo("--------");
-    for (int i = 0; i < write_num; ++i)
-    {
-      PowerPC::HostWrite_U32(val, curr_addr);
-      LogInfo("Write %08x to address %08x", val, curr_addr);
-      curr_addr += addr_incr * 4;
-      val += val_incr;
-      LogInfo("Value Update: %08x", val);
-      LogInfo("Current Hardware Address Update: %08x", curr_addr);
-    }
-    LogInfo("--------");
-    break;
-
-  default:
-    LogInfo("Bad Size");
-    PanicAlertT("Action Replay Error: Invalid size (%08x : address = %08x) in Fill and Slide (%s)",
-                size, new_addr, s_current_code->name.c_str());
-    return false;
-  }
-  return true;
-}
-
-// kenobi's "memory copy" Z-code. Requires an additional master code
-// on a real AR device. Documented here:
-// https://github.com/dolphin-emu/dolphin/wiki/GameCube-Action-Replay-Code-Types#type-z4-size-3--memory-copy
-static bool ZeroCode_MemoryCopy(const u32 val_last, const ARAddr& addr, const u32 data)
-{
-  const u32 addr_dest = val_last & ~0x06000000;
-  const u32 addr_src = addr.GCAddress();
-
-  const u8 num_bytes = data & 0x7FFF;
-
-  LogInfo("Dest Address: %08x", addr_dest);
-  LogInfo("Src Address: %08x", addr_src);
-  LogInfo("Size: %08x", num_bytes);
-
-  if ((data & 0xFF0000) == 0)
-  {
-    if ((data >> 24) != 0x0)
-    {  // Memory Copy With Pointers Support
-      LogInfo("Memory Copy With Pointers Support");
-      LogInfo("--------");
-      const u32 ptr_dest = PowerPC::HostRead_U32(addr_dest);
-      LogInfo("Resolved Dest Address to: %08x", ptr_dest);
-      const u32 ptr_src = PowerPC::HostRead_U32(addr_src);
-      LogInfo("Resolved Src Address to: %08x", ptr_src);
-      for (int i = 0; i < num_bytes; ++i)
+      if (code.user_defined)
       {
-        PowerPC::HostWrite_U8(PowerPC::HostRead_U8(ptr_src + i), ptr_dest + i);
-        LogInfo("Wrote %08x to address %08x", PowerPC::HostRead_U8(ptr_src + i), ptr_dest + i);
+        lines.emplace_back("$" + code.name);
+        for (const ActionReplay::AREntry& op : code.ops)
+        {
+          lines.emplace_back(StringFromFormat("%08X %08X", op.cmd_addr, op.value));
+        }
+      }
+    }
+    local_ini->SetLines("ActionReplay_Enabled", enabled_lines);
+    local_ini->SetLines("ActionReplay", lines);
+  }
+
+  static void LogInfo(const char* format, ...)
+  {
+    if (s_disable_logging)
+      return;
+    bool use_internal_log = s_use_internal_log.load(std::memory_order_relaxed);
+    if (MAX_LOGLEVEL < LogTypes::LINFO && !use_internal_log)
+      return;
+
+    va_list args;
+    va_start(args, format);
+    std::string text = StringFromFormatV(format, args);
+    va_end(args);
+    INFO_LOG(ACTIONREPLAY, "%s", text.c_str());
+
+    if (use_internal_log)
+    {
+      text += '\n';
+      s_internal_log.emplace_back(std::move(text));
+    }
+  }
+
+  void EnableSelfLogging(bool enable)
+  {
+    s_use_internal_log.store(enable, std::memory_order_relaxed);
+  }
+
+  std::vector<std::string> GetSelfLog()
+  {
+    std::lock_guard<std::mutex> guard(s_lock);
+    return s_internal_log;
+  }
+
+  void ClearSelfLog()
+  {
+    std::lock_guard<std::mutex> guard(s_lock);
+    s_internal_log.clear();
+  }
+
+  bool IsSelfLogging()
+  {
+    return s_use_internal_log.load(std::memory_order_relaxed);
+  }
+
+  // ----------------------
+  // Code Functions
+  static bool Subtype_RamWriteAndFill(const ARAddr& addr, const u32 data)
+  {
+    const u32 new_addr = addr.GCAddress();
+
+    LogInfo("Hardware Address: %08x", new_addr);
+    LogInfo("Size: %08x", addr.size);
+
+    switch (addr.size)
+    {
+    case DATATYPE_8BIT:
+    {
+      LogInfo("8-bit Write");
+      LogInfo("--------");
+      u32 repeat = data >> 8;
+      for (u32 i = 0; i <= repeat; ++i)
+      {
+        PowerPC::HostWrite_U8(data & 0xFF, new_addr + i);
+        LogInfo("Wrote %08x to address %08x", data & 0xFF, new_addr + i);
       }
       LogInfo("--------");
+      break;
+    }
+
+    case DATATYPE_16BIT:
+    {
+      LogInfo("16-bit Write");
+      LogInfo("--------");
+      u32 repeat = data >> 16;
+      for (u32 i = 0; i <= repeat; ++i)
+      {
+        PowerPC::HostWrite_U16(data & 0xFFFF, new_addr + i * 2);
+        LogInfo("Wrote %08x to address %08x", data & 0xFFFF, new_addr + i * 2);
+      }
+      LogInfo("--------");
+      break;
+    }
+
+    case DATATYPE_32BIT_FLOAT:
+    case DATATYPE_32BIT:  // Dword write
+      LogInfo("32-bit Write");
+      LogInfo("--------");
+      PowerPC::HostWrite_U32(data, new_addr);
+      LogInfo("Wrote %08x to address %08x", data, new_addr);
+      LogInfo("--------");
+      break;
+
+    default:
+      LogInfo("Bad Size");
+      PanicAlertT("Action Replay Error: Invalid size "
+        "(%08x : address = %08x) in Ram Write And Fill (%s)",
+        addr.size, addr.gcaddr, s_current_code->name.c_str());
+      return false;
+    }
+
+    return true;
+  }
+
+  static bool Subtype_WriteToPointer(const ARAddr& addr, const u32 data)
+  {
+    const u32 new_addr = addr.GCAddress();
+    const u32 ptr = PowerPC::HostRead_U32(new_addr);
+
+    LogInfo("Hardware Address: %08x", new_addr);
+    LogInfo("Size: %08x", addr.size);
+
+    switch (addr.size)
+    {
+    case DATATYPE_8BIT:
+    {
+      LogInfo("Write 8-bit to pointer");
+      LogInfo("--------");
+      const u8 thebyte = data & 0xFF;
+      const u32 offset = data >> 8;
+      LogInfo("Pointer: %08x", ptr);
+      LogInfo("Byte: %08x", thebyte);
+      LogInfo("Offset: %08x", offset);
+      PowerPC::HostWrite_U8(thebyte, ptr + offset);
+      LogInfo("Wrote %08x to address %08x", thebyte, ptr + offset);
+      LogInfo("--------");
+      break;
+    }
+
+    case DATATYPE_16BIT:
+    {
+      LogInfo("Write 16-bit to pointer");
+      LogInfo("--------");
+      const u16 theshort = data & 0xFFFF;
+      const u32 offset = (data >> 16) << 1;
+      LogInfo("Pointer: %08x", ptr);
+      LogInfo("Byte: %08x", theshort);
+      LogInfo("Offset: %08x", offset);
+      PowerPC::HostWrite_U16(theshort, ptr + offset);
+      LogInfo("Wrote %08x to address %08x", theshort, ptr + offset);
+      LogInfo("--------");
+      break;
+    }
+
+    case DATATYPE_32BIT_FLOAT:
+    case DATATYPE_32BIT:
+      LogInfo("Write 32-bit to pointer");
+      LogInfo("--------");
+      PowerPC::HostWrite_U32(data, ptr);
+      LogInfo("Wrote %08x to address %08x", data, ptr);
+      LogInfo("--------");
+      break;
+
+    default:
+      LogInfo("Bad Size");
+      PanicAlertT("Action Replay Error: Invalid size "
+        "(%08x : address = %08x) in Write To Pointer (%s)",
+        addr.size, addr.gcaddr, s_current_code->name.c_str());
+      return false;
+    }
+    return true;
+  }
+
+  static bool Subtype_AddCode(const ARAddr& addr, const u32 data)
+  {
+    // Used to increment/decrement a value in memory
+    const u32 new_addr = addr.GCAddress();
+
+    LogInfo("Hardware Address: %08x", new_addr);
+    LogInfo("Size: %08x", addr.size);
+
+    switch (addr.size)
+    {
+    case DATATYPE_8BIT:
+      LogInfo("8-bit Add");
+      LogInfo("--------");
+      PowerPC::HostWrite_U8(PowerPC::HostRead_U8(new_addr) + data, new_addr);
+      LogInfo("Wrote %02x to address %08x", PowerPC::HostRead_U8(new_addr), new_addr);
+      LogInfo("--------");
+      break;
+
+    case DATATYPE_16BIT:
+      LogInfo("16-bit Add");
+      LogInfo("--------");
+      PowerPC::HostWrite_U16(PowerPC::HostRead_U16(new_addr) + data, new_addr);
+      LogInfo("Wrote %04x to address %08x", PowerPC::HostRead_U16(new_addr), new_addr);
+      LogInfo("--------");
+      break;
+
+    case DATATYPE_32BIT:
+      LogInfo("32-bit Add");
+      LogInfo("--------");
+      PowerPC::HostWrite_U32(PowerPC::HostRead_U32(new_addr) + data, new_addr);
+      LogInfo("Wrote %08x to address %08x", PowerPC::HostRead_U32(new_addr), new_addr);
+      LogInfo("--------");
+      break;
+
+    case DATATYPE_32BIT_FLOAT:
+    {
+      LogInfo("32-bit floating Add");
+      LogInfo("--------");
+
+      const u32 read = PowerPC::HostRead_U32(new_addr);
+      const float read_float = reinterpret_cast<const float&>(read);
+      // data contains an (unsigned?) integer value
+      const float fread = read_float + static_cast<float>(data);
+      const u32 newval = reinterpret_cast<const u32&>(fread);
+      PowerPC::HostWrite_U32(newval, new_addr);
+      LogInfo("Old Value %08x", read);
+      LogInfo("Increment %08x", data);
+      LogInfo("New value %08x", newval);
+      LogInfo("--------");
+      break;
+    }
+
+    default:
+      LogInfo("Bad Size");
+      PanicAlertT("Action Replay Error: Invalid size "
+        "(%08x : address = %08x) in Add Code (%s)",
+        addr.size, addr.gcaddr, s_current_code->name.c_str());
+      return false;
+    }
+    return true;
+  }
+
+  static bool Subtype_MasterCodeAndWriteToCCXXXXXX(const ARAddr& addr, const u32 data)
+  {
+    // code not yet implemented - TODO
+    // u32 new_addr = (addr & 0x01FFFFFF) | 0x80000000;
+    // u8  mcode_type = (data & 0xFF0000) >> 16;
+    // u8  mcode_count = (data & 0xFF00) >> 8;
+    // u8  mcode_number = data & 0xFF;
+    PanicAlertT("Action Replay Error: Master Code and Write To CCXXXXXX not implemented (%s)\n"
+      "Master codes are not needed. Do not use master codes.",
+      s_current_code->name.c_str());
+    return false;
+  }
+
+  // This needs more testing
+  static bool ZeroCode_FillAndSlide(const u32 val_last, const ARAddr& addr, const u32 data)
+  {
+    const u32 new_addr = ARAddr(val_last).GCAddress();
+    const u8 size = ARAddr(val_last).size;
+
+    const s16 addr_incr = static_cast<s16>(data & 0xFFFF);
+    const s8 val_incr = static_cast<s8>(data >> 24);
+    const u8 write_num = static_cast<u8>((data & 0xFF0000) >> 16);
+
+    u32 val = addr;
+    u32 curr_addr = new_addr;
+
+    LogInfo("Current Hardware Address: %08x", new_addr);
+    LogInfo("Size: %08x", addr.size);
+    LogInfo("Write Num: %08x", write_num);
+    LogInfo("Address Increment: %i", addr_incr);
+    LogInfo("Value Increment: %i", val_incr);
+
+    switch (size)
+    {
+    case DATATYPE_8BIT:
+      LogInfo("8-bit Write");
+      LogInfo("--------");
+      for (int i = 0; i < write_num; ++i)
+      {
+        PowerPC::HostWrite_U8(val & 0xFF, curr_addr);
+        curr_addr += addr_incr;
+        val += val_incr;
+        LogInfo("Write %08x to address %08x", val & 0xFF, curr_addr);
+
+        LogInfo("Value Update: %08x", val);
+        LogInfo("Current Hardware Address Update: %08x", curr_addr);
+      }
+      LogInfo("--------");
+      break;
+
+    case DATATYPE_16BIT:
+      LogInfo("16-bit Write");
+      LogInfo("--------");
+      for (int i = 0; i < write_num; ++i)
+      {
+        PowerPC::HostWrite_U16(val & 0xFFFF, curr_addr);
+        LogInfo("Write %08x to address %08x", val & 0xFFFF, curr_addr);
+        curr_addr += addr_incr * 2;
+        val += val_incr;
+        LogInfo("Value Update: %08x", val);
+        LogInfo("Current Hardware Address Update: %08x", curr_addr);
+      }
+      LogInfo("--------");
+      break;
+
+    case DATATYPE_32BIT:
+      LogInfo("32-bit Write");
+      LogInfo("--------");
+      for (int i = 0; i < write_num; ++i)
+      {
+        PowerPC::HostWrite_U32(val, curr_addr);
+        LogInfo("Write %08x to address %08x", val, curr_addr);
+        curr_addr += addr_incr * 4;
+        val += val_incr;
+        LogInfo("Value Update: %08x", val);
+        LogInfo("Current Hardware Address Update: %08x", curr_addr);
+      }
+      LogInfo("--------");
+      break;
+
+    default:
+      LogInfo("Bad Size");
+      PanicAlertT("Action Replay Error: Invalid size (%08x : address = %08x) in Fill and Slide (%s)",
+        size, new_addr, s_current_code->name.c_str());
+      return false;
+    }
+    return true;
+  }
+
+  // kenobi's "memory copy" Z-code. Requires an additional master code
+  // on a real AR device. Documented here:
+  // https://github.com/dolphin-emu/dolphin/wiki/GameCube-Action-Replay-Code-Types#type-z4-size-3--memory-copy
+  static bool ZeroCode_MemoryCopy(const u32 val_last, const ARAddr& addr, const u32 data)
+  {
+    const u32 addr_dest = val_last & ~0x06000000;
+    const u32 addr_src = addr.GCAddress();
+
+    const u8 num_bytes = data & 0x7FFF;
+
+    LogInfo("Dest Address: %08x", addr_dest);
+    LogInfo("Src Address: %08x", addr_src);
+    LogInfo("Size: %08x", num_bytes);
+
+    if ((data & 0xFF0000) == 0)
+    {
+      if ((data >> 24) != 0x0)
+      {  // Memory Copy With Pointers Support
+        LogInfo("Memory Copy With Pointers Support");
+        LogInfo("--------");
+        const u32 ptr_dest = PowerPC::HostRead_U32(addr_dest);
+        LogInfo("Resolved Dest Address to: %08x", ptr_dest);
+        const u32 ptr_src = PowerPC::HostRead_U32(addr_src);
+        LogInfo("Resolved Src Address to: %08x", ptr_src);
+        for (int i = 0; i < num_bytes; ++i)
+        {
+          PowerPC::HostWrite_U8(PowerPC::HostRead_U8(ptr_src + i), ptr_dest + i);
+          LogInfo("Wrote %08x to address %08x", PowerPC::HostRead_U8(ptr_src + i), ptr_dest + i);
+        }
+        LogInfo("--------");
+      }
+      else
+      {  // Memory Copy Without Pointer Support
+        LogInfo("Memory Copy Without Pointers Support");
+        LogInfo("--------");
+        for (int i = 0; i < num_bytes; ++i)
+        {
+          PowerPC::HostWrite_U8(PowerPC::HostRead_U8(addr_src + i), addr_dest + i);
+          LogInfo("Wrote %08x to address %08x", PowerPC::HostRead_U8(addr_src + i), addr_dest + i);
+        }
+        LogInfo("--------");
+        return true;
+      }
     }
     else
-    {  // Memory Copy Without Pointer Support
-      LogInfo("Memory Copy Without Pointers Support");
-      LogInfo("--------");
-      for (int i = 0; i < num_bytes; ++i)
-      {
-        PowerPC::HostWrite_U8(PowerPC::HostRead_U8(addr_src + i), addr_dest + i);
-        LogInfo("Wrote %08x to address %08x", PowerPC::HostRead_U8(addr_src + i), addr_dest + i);
-      }
-      LogInfo("--------");
-      return true;
+    {
+      LogInfo("Bad Value");
+      PanicAlertT("Action Replay Error: Invalid value (%08x) in Memory Copy (%s)", (data & ~0x7FFF),
+        s_current_code->name.c_str());
+      return false;
     }
-  }
-  else
-  {
-    LogInfo("Bad Value");
-    PanicAlertT("Action Replay Error: Invalid value (%08x) in Memory Copy (%s)", (data & ~0x7FFF),
-                s_current_code->name.c_str());
-    return false;
-  }
-  return true;
-}
-
-static bool NormalCode(const ARAddr& addr, const u32 data)
-{
-  switch (addr.subtype)
-  {
-  case SUB_RAM_WRITE:  // Ram write (and fill)
-    LogInfo("Doing Ram Write And Fill");
-    if (!Subtype_RamWriteAndFill(addr, data))
-      return false;
-    break;
-
-  case SUB_WRITE_POINTER:  // Write to pointer
-    LogInfo("Doing Write To Pointer");
-    if (!Subtype_WriteToPointer(addr, data))
-      return false;
-    break;
-
-  case SUB_ADD_CODE:  // Increment Value
-    LogInfo("Doing Add Code");
-    if (!Subtype_AddCode(addr, data))
-      return false;
-    break;
-
-  case SUB_MASTER_CODE:  // Master Code & Write to CCXXXXXX
-    LogInfo("Doing Master Code And Write to CCXXXXXX (ncode not supported)");
-    if (!Subtype_MasterCodeAndWriteToCCXXXXXX(addr, data))
-      return false;
-    break;
-
-  default:
-    LogInfo("Bad Subtype");
-    PanicAlertT("Action Replay: Normal Code 0: Invalid Subtype %08x (%s)", addr.subtype,
-                s_current_code->name.c_str());
-    return false;
+    return true;
   }
 
-  return true;
-}
-
-static bool CompareValues(const u32 val1, const u32 val2, const int type)
-{
-  switch (type)
-  {
-  case CONDTIONAL_EQUAL:
-    LogInfo("Type 1: If Equal");
-    return val1 == val2;
-
-  case CONDTIONAL_NOT_EQUAL:
-    LogInfo("Type 2: If Not Equal");
-    return val1 != val2;
-
-  case CONDTIONAL_LESS_THAN_SIGNED:
-    LogInfo("Type 3: If Less Than (Signed)");
-    return static_cast<s32>(val1) < static_cast<s32>(val2);
-
-  case CONDTIONAL_GREATER_THAN_SIGNED:
-    LogInfo("Type 4: If Greater Than (Signed)");
-    return static_cast<s32>(val1) > static_cast<s32>(val2);
-
-  case CONDTIONAL_LESS_THAN_UNSIGNED:
-    LogInfo("Type 5: If Less Than (Unsigned)");
-    return val1 < val2;
-
-  case CONDTIONAL_GREATER_THAN_UNSIGNED:
-    LogInfo("Type 6: If Greater Than (Unsigned)");
-    return val1 > val2;
-
-  case CONDTIONAL_AND:
-    LogInfo("Type 7: If And");
-    return !!(val1 & val2);  // bitwise AND
-
-  default:
-    LogInfo("Unknown Compare type");
-    PanicAlertT("Action Replay: Invalid Normal Code Type %08x (%s)", type,
-                s_current_code->name.c_str());
-    return false;
-  }
-}
-
-static bool ConditionalCode(const ARAddr& addr, const u32 data, int* const pSkipCount)
-{
-  const u32 new_addr = addr.GCAddress();
-
-  LogInfo("Size: %08x", addr.size);
-  LogInfo("Hardware Address: %08x", new_addr);
-
-  bool result = true;
-
-  switch (addr.size)
-  {
-  case DATATYPE_8BIT:
-    result = CompareValues(PowerPC::HostRead_U8(new_addr), (data & 0xFF), addr.type);
-    break;
-
-  case DATATYPE_16BIT:
-    result = CompareValues(PowerPC::HostRead_U16(new_addr), (data & 0xFFFF), addr.type);
-    break;
-
-  case DATATYPE_32BIT_FLOAT:
-  case DATATYPE_32BIT:
-    result = CompareValues(PowerPC::HostRead_U32(new_addr), data, addr.type);
-    break;
-
-  default:
-    LogInfo("Bad Size");
-    PanicAlertT("Action Replay: Conditional Code: Invalid Size %08x (%s)", addr.size,
-                s_current_code->name.c_str());
-    return false;
-  }
-
-  // if the comparison failed we need to skip some lines
-  if (false == result)
+  static bool NormalCode(const ARAddr& addr, const u32 data)
   {
     switch (addr.subtype)
     {
-    case CONDTIONAL_ONE_LINE:
-    case CONDTIONAL_TWO_LINES:
-      *pSkipCount = addr.subtype + 1;  // Skip 1 or 2 lines
+    case SUB_RAM_WRITE:  // Ram write (and fill)
+      LogInfo("Doing Ram Write And Fill");
+      if (!Subtype_RamWriteAndFill(addr, data))
+        return false;
       break;
 
-    // Skip all lines,
-    // Skip lines until a "00000000 40000000" line is reached
-    case CONDTIONAL_ALL_LINES:
-    case CONDTIONAL_ALL_LINES_UNTIL:
-      *pSkipCount = -static_cast<int>(addr.subtype);
+    case SUB_WRITE_POINTER:  // Write to pointer
+      LogInfo("Doing Write To Pointer");
+      if (!Subtype_WriteToPointer(addr, data))
+        return false;
+      break;
+
+    case SUB_ADD_CODE:  // Increment Value
+      LogInfo("Doing Add Code");
+      if (!Subtype_AddCode(addr, data))
+        return false;
+      break;
+
+    case SUB_MASTER_CODE:  // Master Code & Write to CCXXXXXX
+      LogInfo("Doing Master Code And Write to CCXXXXXX (ncode not supported)");
+      if (!Subtype_MasterCodeAndWriteToCCXXXXXX(addr, data))
+        return false;
       break;
 
     default:
       LogInfo("Bad Subtype");
-      PanicAlertT("Action Replay: Normal Code %i: Invalid subtype %08x (%s)", 1, addr.subtype,
-                  s_current_code->name.c_str());
+      PanicAlertT("Action Replay: Normal Code 0: Invalid Subtype %08x (%s)", addr.subtype,
+        s_current_code->name.c_str());
+      return false;
+    }
+
+    return true;
+  }
+
+  static bool CompareValues(const u32 val1, const u32 val2, const int type)
+  {
+    switch (type)
+    {
+    case CONDTIONAL_EQUAL:
+      LogInfo("Type 1: If Equal");
+      return val1 == val2;
+
+    case CONDTIONAL_NOT_EQUAL:
+      LogInfo("Type 2: If Not Equal");
+      return val1 != val2;
+
+    case CONDTIONAL_LESS_THAN_SIGNED:
+      LogInfo("Type 3: If Less Than (Signed)");
+      return static_cast<s32>(val1) < static_cast<s32>(val2);
+
+    case CONDTIONAL_GREATER_THAN_SIGNED:
+      LogInfo("Type 4: If Greater Than (Signed)");
+      return static_cast<s32>(val1) > static_cast<s32>(val2);
+
+    case CONDTIONAL_LESS_THAN_UNSIGNED:
+      LogInfo("Type 5: If Less Than (Unsigned)");
+      return val1 < val2;
+
+    case CONDTIONAL_GREATER_THAN_UNSIGNED:
+      LogInfo("Type 6: If Greater Than (Unsigned)");
+      return val1 > val2;
+
+    case CONDTIONAL_AND:
+      LogInfo("Type 7: If And");
+      return !!(val1 & val2);  // bitwise AND
+
+    default:
+      LogInfo("Unknown Compare type");
+      PanicAlertT("Action Replay: Invalid Normal Code Type %08x (%s)", type,
+        s_current_code->name.c_str());
       return false;
     }
   }
 
-  return true;
-}
-
-// NOTE: Lock needed to give mutual exclusion to s_current_code and LogInfo
-static bool RunCodeLocked(const ARCode& arcode)
-{
-  // The mechanism is different than what the real AR uses, so there may be compatibility problems.
-
-  bool do_fill_and_slide = false;
-  bool do_memory_copy = false;
-
-  // used for conditional codes
-  int skip_count = 0;
-
-  u32 val_last = 0;
-
-  s_current_code = &arcode;
-
-  LogInfo("Code Name: %s", arcode.name.c_str());
-  LogInfo("Number of codes: %zu", arcode.ops.size());
-
-  for (const AREntry& entry : arcode.ops)
+  static bool ConditionalCode(const ARAddr& addr, const u32 data, int* const pSkipCount)
   {
-    const ARAddr addr(entry.cmd_addr);
-    const u32 data = entry.value;
+    const u32 new_addr = addr.GCAddress();
 
-    // after a conditional code, skip lines if needed
-    if (skip_count)
+    LogInfo("Size: %08x", addr.size);
+    LogInfo("Hardware Address: %08x", new_addr);
+
+    bool result = true;
+
+    switch (addr.size)
     {
-      if (skip_count > 0)  // skip x lines
-      {
-        LogInfo("Line skipped");
-        --skip_count;
-      }
-      else if (-CONDTIONAL_ALL_LINES == skip_count)
-      {
-        // skip all lines
-        LogInfo("All Lines skipped");
-        return true;  // don't need to iterate through the rest of the ops
-      }
-      else if (-CONDTIONAL_ALL_LINES_UNTIL == skip_count)
-      {
-        // skip until a "00000000 40000000" line is reached
-        LogInfo("Line skipped");
-        if (addr == 0 && 0x40000000 == data)  // check for an endif line
-          skip_count = 0;
-      }
+    case DATATYPE_8BIT:
+      result = CompareValues(PowerPC::HostRead_U8(new_addr), (data & 0xFF), addr.type);
+      break;
 
-      continue;
-    }
+    case DATATYPE_16BIT:
+      result = CompareValues(PowerPC::HostRead_U16(new_addr), (data & 0xFFFF), addr.type);
+      break;
 
-    LogInfo("--- Running Code: %08x %08x ---", addr.address, data);
-    // LogInfo("Command: %08x", cmd);
-
-    // Do Fill & Slide
-    if (do_fill_and_slide)
-    {
-      do_fill_and_slide = false;
-      LogInfo("Doing Fill And Slide");
-      if (false == ZeroCode_FillAndSlide(val_last, addr, data))
-        return false;
-      continue;
-    }
-
-    // Memory Copy
-    if (do_memory_copy)
-    {
-      do_memory_copy = false;
-      LogInfo("Doing Memory Copy");
-      if (false == ZeroCode_MemoryCopy(val_last, addr, data))
-        return false;
-      continue;
-    }
-
-    // ActionReplay program self modification codes
-    if (addr >= 0x00002000 && addr < 0x00003000)
-    {
-      LogInfo(
-          "This action replay simulator does not support codes that modify Action Replay itself.");
-      PanicAlertT(
-          "This action replay simulator does not support codes that modify Action Replay itself.");
-      return false;
-    }
-
-    // skip these weird init lines
-    // TODO: Where are the "weird init lines"?
-    // if (iter == code.ops.begin() && cmd == 1)
-    // continue;
-
-    // Zero codes
-    if (0x0 == addr)  // Check if the code is a zero code
-    {
-      const u8 zcode = data >> 29;
-
-      LogInfo("Doing Zero Code %08x", zcode);
-
-      switch (zcode)
-      {
-      case ZCODE_END:  // END OF CODES
-        LogInfo("ZCode: End Of Codes");
-        return true;
-
-      // TODO: the "00000000 40000000"(end if) codes fall into this case, I don't think that is
-      // correct
-      case ZCODE_NORM:  // Normal execution of codes
-        // Todo: Set register 1BB4 to 0
-        LogInfo("ZCode: Normal execution of codes, set register 1BB4 to 0 (zcode not supported)");
-        break;
-
-      case ZCODE_ROW:  // Executes all codes in the same row
-        // Todo: Set register 1BB4 to 1
-        LogInfo("ZCode: Executes all codes in the same row, Set register 1BB4 to 1 (zcode not "
-                "supported)");
-        PanicAlertT("Zero 3 code not supported");
-        return false;
-
-      case ZCODE_04:  // Fill & Slide or Memory Copy
-        if (0x3 == ((data >> 25) & 0x03))
-        {
-          LogInfo("ZCode: Memory Copy");
-          do_memory_copy = true;
-          val_last = data;
-        }
-        else
-        {
-          LogInfo("ZCode: Fill And Slide");
-          do_fill_and_slide = true;
-          val_last = data;
-        }
-        break;
-
-      default:
-        LogInfo("ZCode: Unknown");
-        PanicAlertT("Zero code unknown to Dolphin: %08x", zcode);
-        return false;
-      }
-
-      // done handling zero codes
-      continue;
-    }
-
-    // Normal codes
-    LogInfo("Doing Normal Code %08x", addr.type);
-    LogInfo("Subtype: %08x", addr.subtype);
-
-    switch (addr.type)
-    {
-    case 0x00:
-      if (false == NormalCode(addr, data))
-        return false;
+    case DATATYPE_32BIT_FLOAT:
+    case DATATYPE_32BIT:
+      result = CompareValues(PowerPC::HostRead_U32(new_addr), data, addr.type);
       break;
 
     default:
-      LogInfo("This Normal Code is a Conditional Code");
-      if (false == ConditionalCode(addr, data, &skip_count))
-        return false;
-      break;
+      LogInfo("Bad Size");
+      PanicAlertT("Action Replay: Conditional Code: Invalid Size %08x (%s)", addr.size,
+        s_current_code->name.c_str());
+      return false;
     }
+
+    // if the comparison failed we need to skip some lines
+    if (false == result)
+    {
+      switch (addr.subtype)
+      {
+      case CONDTIONAL_ONE_LINE:
+      case CONDTIONAL_TWO_LINES:
+        *pSkipCount = addr.subtype + 1;  // Skip 1 or 2 lines
+        break;
+
+        // Skip all lines,
+        // Skip lines until a "00000000 40000000" line is reached
+      case CONDTIONAL_ALL_LINES:
+      case CONDTIONAL_ALL_LINES_UNTIL:
+        *pSkipCount = -static_cast<int>(addr.subtype);
+        break;
+
+      default:
+        LogInfo("Bad Subtype");
+        PanicAlertT("Action Replay: Normal Code %i: Invalid subtype %08x (%s)", 1, addr.subtype,
+          s_current_code->name.c_str());
+        return false;
+      }
+    }
+
+    return true;
   }
 
-  return true;
-}
+  // NOTE: Lock needed to give mutual exclusion to s_current_code and LogInfo
+  static bool RunCodeLocked(const ARCode& arcode)
+  {
+    // The mechanism is different than what the real AR uses, so there may be compatibility problems.
 
-void OnMouseClick(wxMouseEvent& event)
-{
-  s_window_focused = true;
-}
+    bool do_fill_and_slide = false;
+    bool do_memory_copy = false;
 
+    // used for conditional codes
+    int skip_count = 0;
+
+    u32 val_last = 0;
+
+    s_current_code = &arcode;
+
+    LogInfo("Code Name: %s", arcode.name.c_str());
+    LogInfo("Number of codes: %zu", arcode.ops.size());
+
+    for (const AREntry& entry : arcode.ops)
+    {
+      const ARAddr addr(entry.cmd_addr);
+      const u32 data = entry.value;
+
+      // after a conditional code, skip lines if needed
+      if (skip_count)
+      {
+        if (skip_count > 0)  // skip x lines
+        {
+          LogInfo("Line skipped");
+          --skip_count;
+        }
+        else if (-CONDTIONAL_ALL_LINES == skip_count)
+        {
+          // skip all lines
+          LogInfo("All Lines skipped");
+          return true;  // don't need to iterate through the rest of the ops
+        }
+        else if (-CONDTIONAL_ALL_LINES_UNTIL == skip_count)
+        {
+          // skip until a "00000000 40000000" line is reached
+          LogInfo("Line skipped");
+          if (addr == 0 && 0x40000000 == data)  // check for an endif line
+            skip_count = 0;
+        }
+
+        continue;
+      }
+
+      LogInfo("--- Running Code: %08x %08x ---", addr.address, data);
+      // LogInfo("Command: %08x", cmd);
+
+      // Do Fill & Slide
+      if (do_fill_and_slide)
+      {
+        do_fill_and_slide = false;
+        LogInfo("Doing Fill And Slide");
+        if (false == ZeroCode_FillAndSlide(val_last, addr, data))
+          return false;
+        continue;
+      }
+
+      // Memory Copy
+      if (do_memory_copy)
+      {
+        do_memory_copy = false;
+        LogInfo("Doing Memory Copy");
+        if (false == ZeroCode_MemoryCopy(val_last, addr, data))
+          return false;
+        continue;
+      }
+
+      // ActionReplay program self modification codes
+      if (addr >= 0x00002000 && addr < 0x00003000)
+      {
+        LogInfo(
+          "This action replay simulator does not support codes that modify Action Replay itself.");
+        PanicAlertT(
+          "This action replay simulator does not support codes that modify Action Replay itself.");
+        return false;
+      }
+
+      // skip these weird init lines
+      // TODO: Where are the "weird init lines"?
+      // if (iter == code.ops.begin() && cmd == 1)
+      // continue;
+
+      // Zero codes
+      if (0x0 == addr)  // Check if the code is a zero code
+      {
+        const u8 zcode = data >> 29;
+
+        LogInfo("Doing Zero Code %08x", zcode);
+
+        switch (zcode)
+        {
+        case ZCODE_END:  // END OF CODES
+          LogInfo("ZCode: End Of Codes");
+          return true;
+
+          // TODO: the "00000000 40000000"(end if) codes fall into this case, I don't think that is
+          // correct
+        case ZCODE_NORM:  // Normal execution of codes
+          // Todo: Set register 1BB4 to 0
+          LogInfo("ZCode: Normal execution of codes, set register 1BB4 to 0 (zcode not supported)");
+          break;
+
+        case ZCODE_ROW:  // Executes all codes in the same row
+          // Todo: Set register 1BB4 to 1
+          LogInfo("ZCode: Executes all codes in the same row, Set register 1BB4 to 1 (zcode not "
+            "supported)");
+          PanicAlertT("Zero 3 code not supported");
+          return false;
+
+        case ZCODE_04:  // Fill & Slide or Memory Copy
+          if (0x3 == ((data >> 25) & 0x03))
+          {
+            LogInfo("ZCode: Memory Copy");
+            do_memory_copy = true;
+            val_last = data;
+          }
+          else
+          {
+            LogInfo("ZCode: Fill And Slide");
+            do_fill_and_slide = true;
+            val_last = data;
+          }
+          break;
+
+        default:
+          LogInfo("ZCode: Unknown");
+          PanicAlertT("Zero code unknown to Dolphin: %08x", zcode);
+          return false;
+        }
+
+        // done handling zero codes
+        continue;
+      }
+
+      // Normal codes
+      LogInfo("Doing Normal Code %08x", addr.type);
+      LogInfo("Subtype: %08x", addr.subtype);
+
+      switch (addr.type)
+      {
+      case 0x00:
+        if (false == NormalCode(addr, data))
+          return false;
+        break;
+
+      default:
+        LogInfo("This Normal Code is a Conditional Code");
+        if (false == ConditionalCode(addr, data, &skip_count))
+          return false;
+        break;
+      }
+    }
+
+    return true;
+  }
+
+  void OnMouseClick(wxMouseEvent& event)
+  {
+    s_window_focused = true;
+  }
+
+  // Define statement needed for prime.
 #define RunCodeOnce(code) { static bool r = true; if(r) { r = false; code } }
 
-void RunAllActive()
-{
-  if (!SConfig::GetInstance().bEnableCheats)
-    return;
-  // If the mutex is idle then acquiring it should be cheap, fast mutexes
-  // are only atomic ops unless contested. It should be rare for this to
-  // be contested.
-
-  //this really needs to move, find correct place to do window events
-  RunCodeOnce(((CRenderFrame*)Host_GetRenderFrame())->Bind(wxEVT_LEFT_DOWN, OnMouseClick););
-
-#define clamp(min, max, v) ((v) > (max) ? (max) : ((v) < (min) ? (min) : (v)))
-  ////METROID PRIME 1
-  //
-  ////mouse location from previous call to RunAllActive, to be removed
-  //static POINT prevP = { 0 };
-  //static bool firstRun = true;
-
-  //static bool cursorLocked = false;
-
-  ////for vertical angle control, we need to send the actual direction to look
-  ////i believe the angle is measured in radians, clamped ~[-1.22, 1.22]
-  //static float yAngle = 0;
-
-  //POINT cursorPos;
-  //int dx = 0, dy = 0;
-
-  //GetCursorPos(&cursorPos);
-
-  ////TODO: can this can (and should) be refactored into a gecko code
-  ////TODO: add the NOP to stop sloped turning
-  //if (GetAsyncKeyState(VK_DELETE))
-  //{
-  //  if (firstRun)
-  //  {
-  //    //instruction change:
-  //    //   ec000072     ->    ec010072
-  //    //fmuls f0,f0,f1 -> fmuls f0, f1, f1
-  //    //result f0 is (most likely) the vertical turn rate, the result is typically <0.001,
-  //    //the changed instruction makes it more like 100, so we can turn as fast as we need
-  //    u32 newInstruction = 0xec010072;
-
-  //    //address of the instruction is 80098ee4
-  //    PowerPC::HostWrite_U32(newInstruction, 0x80098ee4);
-
-  //    //need to tell dolphin to update it, not 100% sure why, i guess instructions are cached?
-  //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80098ee4);
-  //    firstRun = true;
-  //  }
-  //}
-
-
-
-  //if (s_window_focused || cursorLocked)
-  //{
-  //  s_window_focused = false;
-  //  int cursorX = cursorPos.x, cursorY = cursorPos.y;
-  //  wxRect clientArea;
-  //  Host_RenderScreenToClient(&cursorX, &cursorY);
-  //  Host_GetRendererClientRect(clientArea);
-  //  if ((cursorX >= 0 && cursorY >= 0) ||
-  //    cursorLocked)
-  //  {
-  //    cursorLocked = true;
-  //    int cX = (clientArea.GetWidth() / 2) + clientArea.GetX();
-  //    int cY = (clientArea.GetHeight() / 2) + clientArea.GetY();
-  //    dx = cursorPos.x - cX;
-  //    dy = cursorPos.y - cY;
-  //    SetCursorPos(cX, cY);
-  //  }
-  //}
-  //if(!Host_RendererHasFocus())
-  //{
-  //  cursorLocked = false;
-  //}
-
-  ////these need to be tuned, i believe the horizontal turning rate is measured in radians per tick
-  ////so a good scalar could be something like vSensitivity =  (60 * hSensitivity), test it
-  //const float hSensitivity = 10.f;
-  //const float vSensitivity = 80.f * hSensitivity;
-
-  //float dfx = dx * -hSensitivity;
-  //yAngle += (float)dy / -vSensitivity;
-  //yAngle = clamp(-1.22f, 1.22f, yAngle);
-
-  //u32 horizontalSpeed, verticalAngle;
-  //memcpy(&horizontalSpeed, &dfx, 4);
-  //memcpy(&verticalAngle, &yAngle, 4);
-
-
-  ////provide the destination vertical angle
-  //PowerPC::HostWrite_U32(verticalAngle, 0x804D3FFC);
-
-  ////i didn't investigate why, but this has to be 0
-  ////it also has to do with horizontal turning, but is limited to a certain speed
-  //PowerPC::HostWrite_U32(0, 0x804D3D74);
-  ////provide the speed to turn horizontally
-  //PowerPC::HostWrite_U32(horizontalSpeed, 0x804d3d38);
-
-
-
-
-
-
-  //PRIME 2
-
-
-  static float yAngle = 0;
-  static bool cursorLocked = false;
-  static bool firstRun = true;
-  POINT cursorPos;
-  int dx = 0, dy = 0;
-
-  GetCursorPos(&cursorPos);
-
-  if (GetAsyncKeyState(VK_DELETE))
+//*****************************************************************************************
+// Metroid Prime 1
+//*****************************************************************************************
+  void primeOne()
   {
-    if (firstRun)
+    static bool firstRun = true;
+
+    // for vertical angle control, we need to send the actual direction to look
+    // i believe the angle is measured in radians, clamped ~[-1.22, 1.22]
+    static float yAngle = 0;
+
+    int dx = InputExternal::g_mouse_input.GetDeltaHorizontalAxis(), dy = InputExternal::g_mouse_input.GetDeltaVerticalAxis();
+
+
+    // TODO: can this can (and should) be refactored into a gecko code
+    // TODO: add the NOP to stop sloped turning
+    if (GetAsyncKeyState(VK_DELETE))
     {
-      u32 newInstruction1 = 0xc0430184;
-      u32 newInstruction2 = 0x60000000;
-      PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8);
-      PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c);
-      PowerPC::HostWrite_U32(newInstruction2, 0x80147f70);
-      PowerPC::HostWrite_U32(newInstruction2, 0x80147f98);
-      PowerPC::HostWrite_U32(newInstruction2, 0x80135b20);
-      PowerPC::HostWrite_U32(newInstruction2, 0x8008bb48);
-      PowerPC::HostWrite_U32(newInstruction2, 0x8008bb18);
+      if (firstRun)
+      {
+        // instruction change:
+        //   ec000072     ->    ec010072
+        // fmuls f0,f0,f1 -> fmuls f0, f1, f1
+        // result f0 is (most likely) the vertical turn rate, the result is typically <0.001,
+        // the changed instruction makes it more like 100, so we can turn as fast as we need
+        u32 newInstruction = 0xec010072;
 
+        //address of the instruction is 80098ee4
+        PowerPC::HostWrite_U32(newInstruction, 0x80098ee4);
 
-      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
-      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
-      PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f70);
-      PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f98);
-      PowerPC::ScheduleInvalidateCacheThreadSafe(0x80135b20);
-      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb48);
-      PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb18);
-      firstRun = false;
+        //need to tell dolphin to update it, not 100% sure why, i guess instructions are cached?
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80098ee4);
+        firstRun = true;
+      }
     }
-  }
-  if (s_window_focused || cursorLocked)
-  {
-    s_window_focused = false;
-    int cursorX = cursorPos.x, cursorY = cursorPos.y;
-    wxRect clientArea;
-    Host_RenderScreenToClient(&cursorX, &cursorY);
-    Host_GetRendererClientRect(clientArea);
-    if ((cursorX >= 0 && cursorY >= 0) ||
-      cursorLocked)
-    {
-      cursorLocked = true;
-      int cX = (clientArea.GetWidth() / 2) + clientArea.GetX();
-      int cY = (clientArea.GetHeight() / 2) + clientArea.GetY();
-      dx = cursorPos.x - cX;
-      dy = cursorPos.y - cY;
-      SetCursorPos(cX, cY);
-    }
-  }
-  if (!Host_RendererHasFocus())
-  {
-    cursorLocked = false;
-  }
 
-  const float hSensitivity = 10.f;
-  const float vSensitivity = 80.f * hSensitivity;
+    // Add some kind of slider control for this
+    float sensitivity = 10.f;
 
-  float dfx = dx * -hSensitivity;
-  yAngle += (float)dy / -vSensitivity;
-  yAngle = clamp(-1.4f, 1.4f, yAngle);
+    // vertical sensitivity converts between rad/sec to rad and scales with sensitivity
+    // check framerate here
+    float vSensitivity = (sensitivity * TURNRATE_RATIO) / (60.0f);
 
-  u32 baseAddress = PowerPC::HostRead_U32(0x804e72e8 + 0x14f4);
-  //modify this, see if we can check game state or something somehow (what writes to baseAddress?)
-  if (baseAddress > 0x80000000 && baseAddress < 0x81800000)
-  {
+    float dfx = dx * -sensitivity;
+    yAngle += ((float)dy * -vSensitivity);
+    yAngle = clamp(-1.22f, 1.22f, yAngle);
+
+
     u32 horizontalSpeed, verticalAngle;
     memcpy(&horizontalSpeed, &dfx, 4);
     memcpy(&verticalAngle, &yAngle, 4);
-    PowerPC::HostWrite_U32(verticalAngle, baseAddress + 0x5f0);
-    //    PowerPC::HostWrite_U32(mem2, 0x80bd43f4);
-    PowerPC::HostWrite_U32(horizontalSpeed, baseAddress + 0x178);
+
+
+    //  Provide the destination vertical angle
+    PowerPC::HostWrite_U32(verticalAngle, 0x804D3FFC);
+
+    //  I didn't investigate why, but this has to be 0
+    //  it also has to do with horizontal turning, but is limited to a certain speed
+    PowerPC::HostWrite_U32(0, 0x804D3D74);
+    //  provide the speed to turn horizontally
+    PowerPC::HostWrite_U32(horizontalSpeed, 0x804d3d38);
   }
 
-  
+  //*****************************************************************************************
+  // Metroid Prime 2
+  //*****************************************************************************************
+  void primeTwo()
+  {
+    // You give yAngle the angle you want to turn to
+    static float yAngle = 0;
 
-  std::lock_guard<std::mutex> guard(s_lock);
-  s_active_codes.erase(std::remove_if(s_active_codes.begin(), s_active_codes.end(),
-                                      [](const ARCode& code) {
-                                        bool success = RunCodeLocked(code);
-                                        LogInfo("\n");
-                                        return !success;
-                                      }),
-                       s_active_codes.end());
-  s_disable_logging = true;
-}
+    // Makes sure that code is only run once
+    static bool firstRun = true;
+
+    // Create values for Change in X and Y mouse position
+    int dx = InputExternal::g_mouse_input.GetDeltaHorizontalAxis(), dy = InputExternal::g_mouse_input.GetDeltaVerticalAxis();
+
+    // Check if the delete key was pressed
+    if (GetAsyncKeyState(VK_DELETE))
+    {
+      // This code should only be run once
+      if (firstRun)
+      {
+        // u32 - typedef as an unsigned integer; This is 4bytes, or 32bits
+        u32 newInstruction1 = 0xc0430184;
+
+        // This is a nop instruction - Does Nothing For the following 7 memory addresses
+        u32 newInstruction2 = 0x60000000;
+        PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8); // Allows unlimited vertical turning speed 
+
+        PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c); // 
+
+        PowerPC::HostWrite_U32(newInstruction2, 0x80147f70); // These fix readjustment where if you turn up really fast hten you notice that the game foreces your crosshair down a little bit
+        PowerPC::HostWrite_U32(newInstruction2, 0x80147f98); // really, it just improves and fixes the games little BS quirks
+
+        PowerPC::HostWrite_U32(newInstruction2, 0x80135b20); // Fixes Horizontal choppiness
+
+        PowerPC::HostWrite_U32(newInstruction2, 0x8008bb48); // Fixes turning the camera when standing on a sloped surface.
+        PowerPC::HostWrite_U32(newInstruction2, 0x8008bb18); //   
+
+                                                             // Making the above memory-writes actually do stuff - Not calling this would not affect the game
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f70);
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f98);
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80135b20);
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb48);
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb18);
+
+        // Set firstRun to false to make sure this is only run once
+        firstRun = false;
+      }
+    }
+
+    // hSensitivity - Horizontal axis sensitivity
+    // vSensitivity - Vertical axis sensitivity
+    const float hSensitivity = 10.f;
+    const float vSensitivity = 80.f * hSensitivity;
+
+    // Rate at which we will turn by multiplying the change in x by hSensitivity.
+    float dfx = dx * -hSensitivity;
+
+    // Scale mouse movement by sensitivity
+    yAngle += (float)dy / -vSensitivity;
+    yAngle = clamp(-1.4f, 1.4f, yAngle);
+
+    // Specific to prime 2 - This find's the "camera structure" for prime 2
+    u32 baseAddress = PowerPC::HostRead_U32(0x804e72e8 + 0x14f4);
+
+    // Modify this, see if we can check game state or something somehow (what writes to baseAddress?)
+    // Makes sure the baaseaddress is within the valid range of memoryaddresses for GamCube/Wii
+    if (baseAddress > 0x80000000 && baseAddress < 0x81800000)
+    {
+      // HorizontalSpeed and Vertical angle to store values, used as buffers for memcpy reference variables
+      u32 horizontalSpeed, verticalAngle;
+
+      // Copying values representing floating point data into integers
+      memcpy(&horizontalSpeed, &dfx, 4);
+      memcpy(&verticalAngle, &yAngle, 4);
+
+      // Write the data to the addresses we want
+      PowerPC::HostWrite_U32(verticalAngle, baseAddress + 0x5f0);
+      PowerPC::HostWrite_U32(horizontalSpeed, baseAddress + 0x178);
+    }
+  }
+
+  //*****************************************************************************************
+  // Metroid Prime 3
+  //*****************************************************************************************
+  void primeThree()
+  {
+
+  }
+
+  void RunAllActive()
+  {
+    // Dolphins Stuff
+    if (!SConfig::GetInstance().bEnableCheats)
+      return;
+
+    // need to check which game we're running...
+    primeOne();
+    //    primeTwo();
+    //    primeThree();
+
+    InputExternal::g_mouse_input.ResetDeltas();
+
+    // Dolphins Stuff
+    // If the mutex is idle then acquiring it should be cheap, fast mutexes
+    // are only atomic ops unless contested. It should be rare for this to
+    // be contested.
+    std::lock_guard<std::mutex> guard(s_lock);
+    s_active_codes.erase(std::remove_if(s_active_codes.begin(), s_active_codes.end(),
+      [](const ARCode& code) {
+      bool success = RunCodeLocked(code);
+      LogInfo("\n");
+      return !success;
+    }),
+      s_active_codes.end());
+    s_disable_logging = true;
+  }
 
 }  // namespace ActionReplay

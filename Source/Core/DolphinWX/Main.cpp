@@ -497,7 +497,14 @@ void Host_GetRendererClientRect(wxRect& rectOut)
 
 void* Host_GetRenderFrame()
 {
-  return main_frame->GetRenderFrame();
+  if (main_frame)
+  {
+    return main_frame->GetRenderFrame();
+  }
+  else
+  {
+    return nullptr;
+  }
 }
 
 void Host_ShowVideoConfig(void* parent, const std::string& backend_name)
