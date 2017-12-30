@@ -991,10 +991,16 @@ namespace ActionReplay
 
         //address of the instruction is 80098ee4
         PowerPC::HostWrite_U32(newInstruction, 0x80098ee4);
+        PowerPC::HostWrite_U32(0x60000000, 0x80099138);
+        PowerPC::HostWrite_U32(0x60000000, 0x80183a8c);
+        PowerPC::HostWrite_U32(0x60000000, 0x80183a64);
 
         //need to tell dolphin to update it, not 100% sure why, i guess instructions are cached?
         PowerPC::ScheduleInvalidateCacheThreadSafe(0x80098ee4);
-        firstRun = true;
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80099138);
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80183a8c);
+        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80183a64);
+        firstRun = false;
       }
     }
 

@@ -67,6 +67,7 @@ namespace InputExternal
     if (cur_time - last_update > 250)
     {
       m_mo_device->GetDeviceState(sizeof(DIMOUSESTATE2), &state_prev);
+      last_update = cur_time;
     }
 
     // Retrieve input data from our device
@@ -86,10 +87,7 @@ namespace InputExternal
 
       state_prev = input_temp;
     }
-    else if (!cursor_locked)
-    {
-      ResetDeltas();
-    }
+
 
     // Ensure the cursor is locked when it needs to be
     LockCursorToGameWindow();
