@@ -99,6 +99,10 @@
 
 #include "InputCommon\DInputMouseAbsolute.h"
 
+#include "Core/ActionReplay.h"
+
+#include "DolphinWX\SensitivitySlider.h"
+
 class InputConfig;
 class wxFrame;
 
@@ -212,6 +216,10 @@ void CFrame::BindMenuBarEvents()
   Bind(wxEVT_MENU, &CFrame::OnHelp, this, IDM_HELP_ONLINE_DOCS);
   Bind(wxEVT_MENU, &CFrame::OnHelp, this, IDM_HELP_GITHUB);
   Bind(wxEVT_MENU, &CFrame::OnHelp, this, wxID_ABOUT);
+
+  Bind(wxEVT_MENU, &CFrame::OnPrimeSettings, this, IDM_SENSITIVITY);
+  Bind(wxEVT_MENU, &CFrame::OnPrimeSettings, this, IDM_GAMESELECT_PRIME1);
+  Bind(wxEVT_MENU, &CFrame::OnPrimeSettings, this, IDM_GAMESELECT_PRIME2);
 
   if (m_use_debugger)
     BindDebuggerMenuBarEvents();
@@ -1105,6 +1113,27 @@ void CFrame::OnHelp(wxCommandEvent& event)
     break;
   case IDM_HELP_GITHUB:
     WxUtils::Launch("https://github.com/dolphin-emu/dolphin");
+    break;
+  }
+}
+
+void CFrame::OnPrimeSettings(wxCommandEvent& event)
+{
+  switch (event.GetId())
+  {
+  case IDM_SENSITIVITY:
+  {
+    SensitivitySlider frame(this);
+    HotkeyManagerEmu::Enable(false);
+    frame.ShowModal();
+    HotkeyManagerEmu::Enable(true);
+  }
+  break;
+  case IDM_GAMESELECT_PRIME1:
+    ActionReplay::SetActiveGame(1);
+    break;
+  case IDM_GAMESELECT_PRIME2:
+    ActionReplay::SetActiveGame(2);
     break;
   }
 }

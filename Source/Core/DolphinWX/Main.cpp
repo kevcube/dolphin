@@ -191,7 +191,7 @@ void DolphinApp::ParseCommandLine()
     args.erase(args.begin());
   }
 
-  m_use_debugger = true;//options.is_set("debugger");
+  m_use_debugger = options.is_set("debugger");
   m_use_logger = options.is_set("logger");
   m_batch_mode = options.is_set("batch");
 

@@ -276,6 +276,9 @@ private:
   void OnQuit(wxCommandEvent& event);
   void OnHelp(wxCommandEvent& event);
 
+  void OnPrimeSettings(wxCommandEvent& event);
+
+
   void OnReloadThemeBitmaps(wxCommandEvent& event);
   void OnRefreshGameList(wxCommandEvent& event);
   void OnRescanGameList(wxCommandEvent& event);

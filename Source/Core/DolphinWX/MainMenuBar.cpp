@@ -60,6 +60,7 @@ void MainMenuBar::AddMenus()
   }
 
   Append(CreateHelpMenu(), _("&Help"));
+  Append(CreatePrimeSettingsMenu(), _("&Metroid Prime Settings"));
 }
 
 void MainMenuBar::BindEvents()
@@ -527,6 +528,16 @@ wxMenu* MainMenuBar::CreateHelpMenu() const
   help_menu->Append(wxID_ABOUT, _("&About"));
 
   return help_menu;
+}
+
+wxMenu* MainMenuBar::CreatePrimeSettingsMenu() const
+{
+  auto* const prime_settings_menu = new wxMenu;
+  prime_settings_menu->Append(IDM_SENSITIVITY, _("&Sensitivity"));
+  prime_settings_menu->AppendRadioItem(IDM_GAMESELECT_PRIME1, _("&Metroid Prime 1"));
+  prime_settings_menu->AppendRadioItem(IDM_GAMESELECT_PRIME2, _("&Metroid Prime 2"));
+
+  return prime_settings_menu;
 }
 
 void MainMenuBar::OnPopulatePerspectivesMenu(PopulatePerspectivesEvent& event)

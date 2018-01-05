@@ -100,6 +100,8 @@ namespace ActionReplay
   static std::vector<ARCode> s_active_codes;
   static std::vector<std::string> s_internal_log;
   static std::atomic<bool> s_use_internal_log{ false };
+  static float sensitivity = 7.5f;
+  static int active_game = 1;
   // pointer to the code currently being run, (used by log messages that include the code name)
   static const ARCode* s_current_code = nullptr;
   static bool s_disable_logging = false;
@@ -1004,9 +1006,6 @@ namespace ActionReplay
       }
     }
 
-    // Add some kind of slider control for this
-    float sensitivity = 10.f;
-
     // vertical sensitivity converts between rad/sec to rad and scales with sensitivity
     // check framerate here
     float vSensitivity = (sensitivity * TURNRATE_RATIO) / (60.0f);
@@ -1084,15 +1083,14 @@ namespace ActionReplay
 
     // hSensitivity - Horizontal axis sensitivity
     // vSensitivity - Vertical axis sensitivity
-    const float hSensitivity = 10.f;
-    const float vSensitivity = 80.f * hSensitivity;
+    float vSensitivity = (sensitivity * TURNRATE_RATIO) / (60.0f);
 
     // Rate at which we will turn by multiplying the change in x by hSensitivity.
-    float dfx = dx * -hSensitivity;
+    float dfx = dx * -sensitivity;
 
     // Scale mouse movement by sensitivity
-    yAngle += (float)dy / -vSensitivity;
-    yAngle = clamp(-1.4f, 1.4f, yAngle);
+    yAngle += (float)dy * -vSensitivity;
+    yAngle = clamp(-1.04f, 1.04f, yAngle);
 
     // Specific to prime 2 - This find's the "camera structure" for prime 2
     u32 baseAddress = PowerPC::HostRead_U32(0x804e72e8 + 0x14f4);
@@ -1129,9 +1127,18 @@ namespace ActionReplay
       return;
 
     // need to check which game we're running...
-    primeOne();
-    //    primeTwo();
-    //    primeThree();
+    if (active_game == 1)
+    {
+      primeOne();
+    }
+    else if (active_game == 2)
+    {
+      primeTwo();
+    }
+    else if (active_game == 3)
+    {
+      primeThree();
+    }
 
     InputExternal::g_mouse_input.ResetDeltas();
 
@@ -1148,6 +1155,22 @@ namespace ActionReplay
     }),
       s_active_codes.end());
     s_disable_logging = true;
+  }
+
+
+  void SetSensitivity(float sens)
+  {
+    sensitivity = sens;
+  }
+
+  float GetSensitivity()
+  {
+    return sensitivity;
+  }
+
+  void SetActiveGame(int game)
+  {
+    active_game = game;
   }
 
 }  // namespace ActionReplay
