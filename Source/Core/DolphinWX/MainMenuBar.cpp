@@ -534,8 +534,8 @@ wxMenu* MainMenuBar::CreatePrimeSettingsMenu() const
 {
   auto* const prime_settings_menu = new wxMenu;
   prime_settings_menu->Append(IDM_SENSITIVITY, _("&Sensitivity"));
-  prime_settings_menu->AppendRadioItem(IDM_GAMESELECT_PRIME1, _("&Metroid Prime 1"));
-  prime_settings_menu->AppendRadioItem(IDM_GAMESELECT_PRIME2, _("&Metroid Prime 2"));
+  //prime_settings_menu->AppendRadioItem(IDM_GAMESELECT_PRIME1, _("&Metroid Prime 1"));
+  //prime_settings_menu->AppendRadioItem(IDM_GAMESELECT_PRIME2, _("&Metroid Prime 2"));
 
   return prime_settings_menu;
 }

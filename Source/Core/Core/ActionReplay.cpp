@@ -969,7 +969,7 @@ namespace ActionReplay
 //*****************************************************************************************
   void primeOne()
   {
-    static bool firstRun = true;
+    //static bool firstRun = true;
 
     // for vertical angle control, we need to send the actual direction to look
     // i believe the angle is measured in radians, clamped ~[-1.22, 1.22]
@@ -978,33 +978,33 @@ namespace ActionReplay
     int dx = InputExternal::g_mouse_input.GetDeltaHorizontalAxis(), dy = InputExternal::g_mouse_input.GetDeltaVerticalAxis();
 
 
-    // TODO: can this can (and should) be refactored into a gecko code
-    // TODO: add the NOP to stop sloped turning
-    if (GetAsyncKeyState(VK_DELETE))
-    {
-      if (firstRun)
-      {
-        // instruction change:
-        //   ec000072     ->    ec010072
-        // fmuls f0,f0,f1 -> fmuls f0, f1, f1
-        // result f0 is (most likely) the vertical turn rate, the result is typically <0.001,
-        // the changed instruction makes it more like 100, so we can turn as fast as we need
-        u32 newInstruction = 0xec010072;
+    //if (GetAsyncKeyState(VK_DELETE))
+    //{
+    //  if (firstRun)
+    //  {
+    //    // instruction change:
+    //    //   ec000072     ->    ec010072
+    //    // fmuls f0,f0,f1 -> fmuls f0, f1, f1
+    //    // result f0 is (most likely) the vertical turn rate, the result is typically <0.001,
+    //    // the changed instruction makes it more like 100, so we can turn as fast as we need
+    //    u32 newInstruction = 0xec010072;
 
-        //address of the instruction is 80098ee4
-        PowerPC::HostWrite_U32(newInstruction, 0x80098ee4);
-        PowerPC::HostWrite_U32(0x60000000, 0x80099138);
-        PowerPC::HostWrite_U32(0x60000000, 0x80183a8c);
-        PowerPC::HostWrite_U32(0x60000000, 0x80183a64);
+    //    //address of the instruction is 80098ee4
+    //    PowerPC::HostWrite_U32(newInstruction, 0x80098ee4);
+    //    PowerPC::HostWrite_U32(0x60000000, 0x80099138);
+    //    PowerPC::HostWrite_U32(0x60000000, 0x80183a8c);
+    //    PowerPC::HostWrite_U32(0x60000000, 0x80183a64);
 
-        //need to tell dolphin to update it, not 100% sure why, i guess instructions are cached?
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80098ee4);
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80099138);
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80183a8c);
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80183a64);
-        firstRun = false;
-      }
-    }
+    //    
+
+    //    //need to tell dolphin to update it, not 100% sure why, i guess instructions are cached?
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80098ee4);
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80099138);
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80183a8c);
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80183a64);
+    //    firstRun = false;
+    //  }
+    //}
 
     // vertical sensitivity converts between rad/sec to rad and scales with sensitivity
     // check framerate here
@@ -1038,48 +1038,48 @@ namespace ActionReplay
     // You give yAngle the angle you want to turn to
     static float yAngle = 0;
 
-    // Makes sure that code is only run once
-    static bool firstRun = true;
+    //// Makes sure that code is only run once
+    //static bool firstRun = true;
 
     // Create values for Change in X and Y mouse position
     int dx = InputExternal::g_mouse_input.GetDeltaHorizontalAxis(), dy = InputExternal::g_mouse_input.GetDeltaVerticalAxis();
 
-    // Check if the delete key was pressed
-    if (GetAsyncKeyState(VK_DELETE))
-    {
-      // This code should only be run once
-      if (firstRun)
-      {
-        // u32 - typedef as an unsigned integer; This is 4bytes, or 32bits
-        u32 newInstruction1 = 0xc0430184;
+    //// Check if the delete key was pressed
+    //if (GetAsyncKeyState(VK_DELETE))
+    //{
+    //  // This code should only be run once
+    //  if (firstRun)
+    //  {
+    //    // u32 - typedef as an unsigned integer; This is 4bytes, or 32bits
+    //    u32 newInstruction1 = 0xc0430184;
 
-        // This is a nop instruction - Does Nothing For the following 7 memory addresses
-        u32 newInstruction2 = 0x60000000;
-        PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8); // Allows unlimited vertical turning speed 
+    //    // This is a nop instruction - Does Nothing For the following 7 memory addresses
+    //    u32 newInstruction2 = 0x60000000;
+    //    PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8); // Allows unlimited vertical turning speed 
 
-        PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c); // 
+    //    PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c); // 
 
-        PowerPC::HostWrite_U32(newInstruction2, 0x80147f70); // These fix readjustment where if you turn up really fast hten you notice that the game foreces your crosshair down a little bit
-        PowerPC::HostWrite_U32(newInstruction2, 0x80147f98); // really, it just improves and fixes the games little BS quirks
+    //    PowerPC::HostWrite_U32(newInstruction2, 0x80147f70); // These fix readjustment where if you turn up really fast hten you notice that the game foreces your crosshair down a little bit
+    //    PowerPC::HostWrite_U32(newInstruction2, 0x80147f98); // really, it just improves and fixes the games little BS quirks
 
-        PowerPC::HostWrite_U32(newInstruction2, 0x80135b20); // Fixes Horizontal choppiness
+    //    PowerPC::HostWrite_U32(newInstruction2, 0x80135b20); // Fixes Horizontal choppiness
 
-        PowerPC::HostWrite_U32(newInstruction2, 0x8008bb48); // Fixes turning the camera when standing on a sloped surface.
-        PowerPC::HostWrite_U32(newInstruction2, 0x8008bb18); //   
+    //    PowerPC::HostWrite_U32(newInstruction2, 0x8008bb48); // Fixes turning the camera when standing on a sloped surface.
+    //    PowerPC::HostWrite_U32(newInstruction2, 0x8008bb18); //   
 
-                                                             // Making the above memory-writes actually do stuff - Not calling this would not affect the game
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f70);
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f98);
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x80135b20);
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb48);
-        PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb18);
+    //                                                         // Making the above memory-writes actually do stuff - Not calling this would not affect the game
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f70);
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f98);
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80135b20);
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb48);
+    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb18);
 
-        // Set firstRun to false to make sure this is only run once
-        firstRun = false;
-      }
-    }
+    //    // Set firstRun to false to make sure this is only run once
+    //    firstRun = false;
+    //  }
+    //}
 
     // hSensitivity - Horizontal axis sensitivity
     // vSensitivity - Vertical axis sensitivity
@@ -1120,6 +1120,44 @@ namespace ActionReplay
 
   }
 
+  void ActivateARCodesFor(int game)
+  {
+    std::vector<ARCode> codes;
+
+    if (game == 1)
+    {
+      ARCode c1, c2, c3, c4;
+      c1.active = c2.active = c3.active = c4.active = true;
+      c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = true;
+
+      c1.ops.push_back(AREntry(0x04098ee4, 0xec010072));
+      c2.ops.push_back(AREntry(0x04099138, 0x60000000));
+      c3.ops.push_back(AREntry(0x04183a8c, 0x60000000));
+      c4.ops.push_back(AREntry(0x04183a64, 0x60000000));
+
+      codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
+    }
+    else if (game == 2)
+    {
+      ARCode c1, c2, c3, c4, c5, c6, c7;
+      c1.active = c2.active = c3.active = c4.active = c5.active = c6.active = c7.active = true;
+      c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = c5.user_defined = c6.user_defined = c7.user_defined = true;
+
+      c1.ops.push_back(AREntry(0x0408ccc8, 0xc0430184));
+      c2.ops.push_back(AREntry(0x0408cd1c, 0x60000000));
+      c3.ops.push_back(AREntry(0x04147f70, 0x60000000));
+      c4.ops.push_back(AREntry(0x04147f98, 0x60000000));
+      c5.ops.push_back(AREntry(0x04135b20, 0x60000000));
+      c6.ops.push_back(AREntry(0x0408bb48, 0x60000000));
+      c7.ops.push_back(AREntry(0x0408bb18, 0x60000000));
+
+      codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
+      codes.push_back(c5); codes.push_back(c6); codes.push_back(c7);
+    }
+
+    ApplyCodes(codes);
+  }
+
   void RunAllActive()
   {
     // Dolphins Stuff
@@ -1127,18 +1165,41 @@ namespace ActionReplay
       return;
 
     // need to check which game we're running...
-    if (active_game == 1)
+
+    u32 instruction_sig = PowerPC::HostRead_Instruction(0x80029334);
+
+    static int last_game_running = -1;
+
+    if (instruction_sig == 0xC0010160)
     {
+      if (last_game_running != 1)
+      {
+        last_game_running = 1;
+        ActivateARCodesFor(1);
+      }
       primeOne();
     }
-    else if (active_game == 2)
+    else if (instruction_sig == 0x4BFFEB65)
     {
+      if (last_game_running != 2)
+      {
+        last_game_running = 2;
+        ActivateARCodesFor(2);
+      }
       primeTwo();
     }
-    else if (active_game == 3)
+    else
+    {
+      if (last_game_running != -1)
+      {
+        last_game_running = -1;
+        ActivateARCodesFor(-1);
+      }
+    }
+    /*else if (active_game == 3)
     {
       primeThree();
-    }
+    }*/
 
     InputExternal::g_mouse_input.ResetDeltas();
 

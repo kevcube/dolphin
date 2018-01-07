@@ -218,8 +218,8 @@ void CFrame::BindMenuBarEvents()
   Bind(wxEVT_MENU, &CFrame::OnHelp, this, wxID_ABOUT);
 
   Bind(wxEVT_MENU, &CFrame::OnPrimeSettings, this, IDM_SENSITIVITY);
-  Bind(wxEVT_MENU, &CFrame::OnPrimeSettings, this, IDM_GAMESELECT_PRIME1);
-  Bind(wxEVT_MENU, &CFrame::OnPrimeSettings, this, IDM_GAMESELECT_PRIME2);
+  //Bind(wxEVT_MENU, &CFrame::OnPrimeSettings, this, IDM_GAMESELECT_PRIME1);
+  //Bind(wxEVT_MENU, &CFrame::OnPrimeSettings, this, IDM_GAMESELECT_PRIME2);
 
   if (m_use_debugger)
     BindDebuggerMenuBarEvents();
@@ -1129,12 +1129,12 @@ void CFrame::OnPrimeSettings(wxCommandEvent& event)
     HotkeyManagerEmu::Enable(true);
   }
   break;
-  case IDM_GAMESELECT_PRIME1:
-    ActionReplay::SetActiveGame(1);
-    break;
-  case IDM_GAMESELECT_PRIME2:
-    ActionReplay::SetActiveGame(2);
-    break;
+  //case IDM_GAMESELECT_PRIME1:
+  //  ActionReplay::SetActiveGame(1);
+  //  break;
+  //case IDM_GAMESELECT_PRIME2:
+  //  ActionReplay::SetActiveGame(2);
+  //  break;
   }
 }
 
