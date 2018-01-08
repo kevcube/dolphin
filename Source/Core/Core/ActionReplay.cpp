@@ -969,6 +969,12 @@ namespace ActionReplay
 //*****************************************************************************************
   void primeOne()
   {
+    // Flag which indicates lock-on
+    if (PowerPC::HostRead_U8(0x804C00B3))
+    {
+      return;
+    }
+
     //static bool firstRun = true;
 
     // for vertical angle control, we need to send the actual direction to look
