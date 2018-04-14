@@ -52,6 +52,7 @@
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/ControllerInterface/Device.h"
 #include "InputCommon/DInputMouseAbsolute.h"
+#include "VideoCommon/RenderBase.h"
 
 namespace ActionReplay
 {
@@ -961,8 +962,36 @@ namespace ActionReplay
     s_window_focused = true;
   }
 
-  // Define statement needed for prime.
-#define RunCodeOnce(code) { static bool r = true; if(r) { r = false; code } }
+  float getAspectRatio()
+  {
+    const unsigned int scale = g_renderer->GetEFBScale();
+    float sW = scale * EFB_WIDTH;
+    float sH = scale * EFB_HEIGHT;
+    return sW / sH;
+  }
+
+  void primeMenu()
+  {
+    static float xPosition = 0;
+    static float yPosition = 0;
+    int dx = InputExternal::g_mouse_input.GetDeltaHorizontalAxis(), dy = InputExternal::g_mouse_input.GetDeltaVerticalAxis();
+    
+    float aspect_ratio = getAspectRatio();
+
+    xPosition += ((float)dx / 500.f);
+    yPosition += ((float)dy * aspect_ratio / (500.f));
+
+    xPosition = clamp(-1, 0.95f, xPosition);
+    yPosition = clamp(-1, 0.90f, yPosition);
+
+    u32 xp, yp;
+
+    memcpy(&xp, &xPosition, sizeof(u32));
+    memcpy(&yp, &yPosition, sizeof(u32));
+
+    PowerPC::HostWrite_U32(xp, 0x80913c9c);
+    PowerPC::HostWrite_U32(yp, 0x80913d5c);
+  }
 
 //*****************************************************************************************
 // Metroid Prime 1
@@ -984,36 +1013,6 @@ namespace ActionReplay
     int dx = InputExternal::g_mouse_input.GetDeltaHorizontalAxis(), dy = InputExternal::g_mouse_input.GetDeltaVerticalAxis();
 
 
-    //if (GetAsyncKeyState(VK_DELETE))
-    //{
-    //  if (firstRun)
-    //  {
-    //    // instruction change:
-    //    //   ec000072     ->    ec010072
-    //    // fmuls f0,f0,f1 -> fmuls f0, f1, f1
-    //    // result f0 is (most likely) the vertical turn rate, the result is typically <0.001,
-    //    // the changed instruction makes it more like 100, so we can turn as fast as we need
-    //    u32 newInstruction = 0xec010072;
-
-    //    //address of the instruction is 80098ee4
-    //    PowerPC::HostWrite_U32(newInstruction, 0x80098ee4);
-    //    PowerPC::HostWrite_U32(0x60000000, 0x80099138);
-    //    PowerPC::HostWrite_U32(0x60000000, 0x80183a8c);
-    //    PowerPC::HostWrite_U32(0x60000000, 0x80183a64);
-
-    //    
-
-    //    //need to tell dolphin to update it, not 100% sure why, i guess instructions are cached?
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80098ee4);
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80099138);
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80183a8c);
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80183a64);
-    //    firstRun = false;
-    //  }
-    //}
-
-    // vertical sensitivity converts between rad/sec to rad and scales with sensitivity
-    // check framerate here
     float vSensitivity = (sensitivity * TURNRATE_RATIO) / (60.0f);
 
     float dfx = dx * -sensitivity;
@@ -1034,6 +1033,8 @@ namespace ActionReplay
     PowerPC::HostWrite_U32(0, 0x804D3D74);
     //  provide the speed to turn horizontally
     PowerPC::HostWrite_U32(horizontalSpeed, 0x804d3d38);
+
+
   }
 
   //*****************************************************************************************
@@ -1049,43 +1050,6 @@ namespace ActionReplay
 
     // Create values for Change in X and Y mouse position
     int dx = InputExternal::g_mouse_input.GetDeltaHorizontalAxis(), dy = InputExternal::g_mouse_input.GetDeltaVerticalAxis();
-
-    //// Check if the delete key was pressed
-    //if (GetAsyncKeyState(VK_DELETE))
-    //{
-    //  // This code should only be run once
-    //  if (firstRun)
-    //  {
-    //    // u32 - typedef as an unsigned integer; This is 4bytes, or 32bits
-    //    u32 newInstruction1 = 0xc0430184;
-
-    //    // This is a nop instruction - Does Nothing For the following 7 memory addresses
-    //    u32 newInstruction2 = 0x60000000;
-    //    PowerPC::HostWrite_U32(newInstruction1, 0x8008ccc8); // Allows unlimited vertical turning speed 
-
-    //    PowerPC::HostWrite_U32(newInstruction2, 0x8008cd1c); // 
-
-    //    PowerPC::HostWrite_U32(newInstruction2, 0x80147f70); // These fix readjustment where if you turn up really fast hten you notice that the game foreces your crosshair down a little bit
-    //    PowerPC::HostWrite_U32(newInstruction2, 0x80147f98); // really, it just improves and fixes the games little BS quirks
-
-    //    PowerPC::HostWrite_U32(newInstruction2, 0x80135b20); // Fixes Horizontal choppiness
-
-    //    PowerPC::HostWrite_U32(newInstruction2, 0x8008bb48); // Fixes turning the camera when standing on a sloped surface.
-    //    PowerPC::HostWrite_U32(newInstruction2, 0x8008bb18); //   
-
-    //                                                         // Making the above memory-writes actually do stuff - Not calling this would not affect the game
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008ccc8);
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008cd1c);
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f70);
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80147f98);
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x80135b20);
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb48);
-    //    PowerPC::ScheduleInvalidateCacheThreadSafe(0x8008bb18);
-
-    //    // Set firstRun to false to make sure this is only run once
-    //    firstRun = false;
-    //  }
-    //}
 
     // hSensitivity - Horizontal axis sensitivity
     // vSensitivity - Vertical axis sensitivity
@@ -1132,14 +1096,16 @@ namespace ActionReplay
 
     if (game == 1)
     {
-      ARCode c1, c2, c3, c4;
-      c1.active = c2.active = c3.active = c4.active = true;
-      c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = true;
+      ARCode c1, c2, c3, c4, c5;
+      c1.active = c2.active = c3.active = c4.active = c5.active = true;
+      c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = c5.user_defined = true;
 
       c1.ops.push_back(AREntry(0x04098ee4, 0xec010072));
       c2.ops.push_back(AREntry(0x04099138, 0x60000000));
       c3.ops.push_back(AREntry(0x04183a8c, 0x60000000));
       c4.ops.push_back(AREntry(0x04183a64, 0x60000000));
+      //c5.ops.push_back(AREntry(0x04))
+
 
       codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
     }
@@ -1196,6 +1162,10 @@ namespace ActionReplay
     }
     else
     {
+      if (instruction_sig == 0x41820064)
+      {
+        primeMenu();
+      }
       if (last_game_running != -1)
       {
         last_game_running = -1;
