@@ -970,7 +970,7 @@ namespace ActionReplay
     return sW / sH;
   }
 
-  void primeMenu()
+  void primeMenu_NTSC()
   {
     static float xPosition = 0;
     static float yPosition = 0;
@@ -992,11 +992,33 @@ namespace ActionReplay
     PowerPC::HostWrite_U32(xp, 0x80913c9c);
     PowerPC::HostWrite_U32(yp, 0x80913d5c);
   }
+  void primeMenu_PAL()
+  {
+    /*static float xPosition = 0;
+    static float yPosition = 0;
+    int dx = InputExternal::g_mouse_input.GetDeltaHorizontalAxis(), dy = InputExternal::g_mouse_input.GetDeltaVerticalAxis();
+
+    float aspect_ratio = getAspectRatio();
+
+    xPosition += ((float)dx / 500.f);
+    yPosition += ((float)dy * aspect_ratio / (500.f));
+
+    xPosition = clamp(-1, 0.95f, xPosition);
+    yPosition = clamp(-1, 0.90f, yPosition);
+
+    u32 xp, yp;
+
+    memcpy(&xp, &xPosition, sizeof(u32));
+    memcpy(&yp, &yPosition, sizeof(u32));
+
+    PowerPC::HostWrite_U32(xp, 0x80913c9c);
+    PowerPC::HostWrite_U32(yp, 0x80913d5c);*/
+  }
 
 //*****************************************************************************************
 // Metroid Prime 1
 //*****************************************************************************************
-  void primeOne()
+  void primeOne_NTSC()
   {
     // Flag which indicates lock-on
     if (PowerPC::HostRead_U8(0x804C00B3))
@@ -1035,6 +1057,45 @@ namespace ActionReplay
     PowerPC::HostWrite_U32(horizontalSpeed, 0x804d3d38);
 
 
+  }
+
+  void primeOne_PAL()
+  {
+    // Flag which indicates lock-on
+    if (PowerPC::HostRead_U8(0x804C3FF3))
+    {
+      return;
+    }
+
+    //static bool firstRun = true;
+
+    // for vertical angle control, we need to send the actual direction to look
+    // i believe the angle is measured in radians, clamped ~[-1.22, 1.22]
+    static float yAngle = 0;
+
+    int dx = InputExternal::g_mouse_input.GetDeltaHorizontalAxis(), dy = InputExternal::g_mouse_input.GetDeltaVerticalAxis();
+
+
+    float vSensitivity = (sensitivity * TURNRATE_RATIO) / (60.0f);
+
+    float dfx = dx * -sensitivity;
+    yAngle += ((float)dy * -vSensitivity);
+    yAngle = clamp(-1.22f, 1.22f, yAngle);
+
+
+    u32 horizontalSpeed, verticalAngle;
+    memcpy(&horizontalSpeed, &dfx, 4);
+    memcpy(&verticalAngle, &yAngle, 4);
+
+
+    //  Provide the destination vertical angle
+    PowerPC::HostWrite_U32(verticalAngle, 0x804D7F3C);
+
+    //  I didn't investigate why, but this has to be 0
+    //  it also has to do with horizontal turning, but is limited to a certain speed
+    PowerPC::HostWrite_U32(0, 0x804d7ca8);
+    //  provide the speed to turn horizontally
+    PowerPC::HostWrite_U32(horizontalSpeed, 0x804D7C78);
   }
 
   //*****************************************************************************************
@@ -1090,86 +1151,159 @@ namespace ActionReplay
 
   }
 
-  void ActivateARCodesFor(int game)
+  //region 0: NTSC
+  //region 1: PAL
+  void ActivateARCodesFor(int game, int region)
   {
     std::vector<ARCode> codes;
-
-    if (game == 1)
+    if (region == 0)
     {
-      ARCode c1, c2, c3, c4, c5;
-      c1.active = c2.active = c3.active = c4.active = c5.active = true;
-      c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = c5.user_defined = true;
+      if (game == 1)
+      {
+        ARCode c1, c2, c3, c4, c5;
+        c1.active = c2.active = c3.active = c4.active = c5.active = true;
+        c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = c5.user_defined = true;
 
-      c1.ops.push_back(AREntry(0x04098ee4, 0xec010072));
-      c2.ops.push_back(AREntry(0x04099138, 0x60000000));
-      c3.ops.push_back(AREntry(0x04183a8c, 0x60000000));
-      c4.ops.push_back(AREntry(0x04183a64, 0x60000000));
-      //c5.ops.push_back(AREntry(0x04))
+        c1.ops.push_back(AREntry(0x04098ee4, 0xec010072));
+        c2.ops.push_back(AREntry(0x04099138, 0x60000000));
+        c3.ops.push_back(AREntry(0x04183a8c, 0x60000000));
+        c4.ops.push_back(AREntry(0x04183a64, 0x60000000));
+        //c5.ops.push_back(AREntry(0x04))
 
 
-      codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
+        codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
+      }
+      else if (game == 2)
+      {
+        ARCode c1, c2, c3, c4, c5, c6, c7;
+        c1.active = c2.active = c3.active = c4.active = c5.active = c6.active = c7.active = true;
+        c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = c5.user_defined = c6.user_defined = c7.user_defined = true;
+
+        c1.ops.push_back(AREntry(0x0408ccc8, 0xc0430184));
+        c2.ops.push_back(AREntry(0x0408cd1c, 0x60000000));
+        c3.ops.push_back(AREntry(0x04147f70, 0x60000000));
+        c4.ops.push_back(AREntry(0x04147f98, 0x60000000));
+        c5.ops.push_back(AREntry(0x04135b20, 0x60000000));
+        c6.ops.push_back(AREntry(0x0408bb48, 0x60000000));
+        c7.ops.push_back(AREntry(0x0408bb18, 0x60000000));
+
+        codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
+        codes.push_back(c5); codes.push_back(c6); codes.push_back(c7);
+      }
     }
-    else if (game == 2)
+    else if (region == 1)
     {
-      ARCode c1, c2, c3, c4, c5, c6, c7;
-      c1.active = c2.active = c3.active = c4.active = c5.active = c6.active = c7.active = true;
-      c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = c5.user_defined = c6.user_defined = c7.user_defined = true;
+      if (game == 1)
+      {
+        ARCode c1, c2, c3, c4, c5;
+        c1.active = c2.active = c3.active = c4.active = c5.active = true;
+        c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = c5.user_defined = true;
 
-      c1.ops.push_back(AREntry(0x0408ccc8, 0xc0430184));
-      c2.ops.push_back(AREntry(0x0408cd1c, 0x60000000));
-      c3.ops.push_back(AREntry(0x04147f70, 0x60000000));
-      c4.ops.push_back(AREntry(0x04147f98, 0x60000000));
-      c5.ops.push_back(AREntry(0x04135b20, 0x60000000));
-      c6.ops.push_back(AREntry(0x0408bb48, 0x60000000));
-      c7.ops.push_back(AREntry(0x0408bb18, 0x60000000));
+        c1.ops.push_back(AREntry(0x04099068, 0xec010072)); //PAL: 04099068
+        c2.ops.push_back(AREntry(0x040992C4, 0x60000000));
+        c3.ops.push_back(AREntry(0x04183CFC, 0x60000000));
+        c4.ops.push_back(AREntry(0x04183D24, 0x60000000));
+        //c5.ops.push_back(AREntry(0x04))
 
-      codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
-      codes.push_back(c5); codes.push_back(c6); codes.push_back(c7);
+
+        codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
+      }
     }
-
     ApplyCodes(codes);
   }
 
   void RunAllActive()
   {
     // Dolphins Stuff
-    if (!SConfig::GetInstance().bEnableCheats)
+    //if (!SConfig::GetInstance().bEnableCheats)
       return;
 
     // need to check which game we're running...
 
-    u32 instruction_sig = PowerPC::HostRead_Instruction(0x80029334);
+    u32 game_sig = PowerPC::HostRead_Instruction(0x80074000);
+
+    int game_id = -1;
+    int region_id = -1;
 
     static int last_game_running = -1;
+    switch (game_sig)
+    {
+    case 0x00000090:
+      game_id = 3;
+      region_id = 0;
+      break;
+    case 0x00000093:
+      game_id = 3;
+      region_id = 1;
+      break;
+    case 0x480008D1:
+      game_id = 0;
+      region_id = 0;
+      break;
+    case 0x7EE3BB78:
+      game_id = 0;
+      region_id = 1;
+      break;
+    case 0x7C6F1B78:
+      game_id = 1;
+      region_id = 0;
+      break;
+    case 0x90030028:
+      game_id = 1;
+      region_id = 1;
+      break;
+    default:
+      game_id = -1;
+      region_id = -1;
+    }
 
-    if (instruction_sig == 0xC0010160)
+    if (game_id == 0)
     {
       if (last_game_running != 1)
       {
         last_game_running = 1;
-        ActivateARCodesFor(1);
+        ActivateARCodesFor(1, region_id);
       }
-      primeOne();
+      if(region_id == 0)
+      {
+        primeOne_NTSC();
+      }
+      else
+      {
+        primeOne_PAL();
+      }
     }
-    else if (instruction_sig == 0x4BFFEB65)
+    else if (game_id == 1)//TODO
     {
       if (last_game_running != 2)
       {
         last_game_running = 2;
-        ActivateARCodesFor(2);
+        ActivateARCodesFor(2, region_id);
       }
-      primeTwo();
-    }
-    else
-    {
-      if (instruction_sig == 0x41820064)
+      
+      if (region_id == 0)
       {
-        primeMenu();
+        primeTwo();
+      }
+      else
+      {
+        //primeOne_PAL();
+      }
+    }
+    else if(game_id == 3)
+    {
+      if (region_id == 0)
+      {
+        primeMenu_NTSC();
+      }
+      else if (region_id == 1)
+      {
+        primeMenu_PAL();
       }
       if (last_game_running != -1)
       {
         last_game_running = -1;
-        ActivateARCodesFor(-1);
+        ActivateARCodesFor(-1, region_id);
       }
     }
     /*else if (active_game == 3)
@@ -1211,3 +1345,5 @@ namespace ActionReplay
   }
 
 }  // namespace ActionReplay
+
+
