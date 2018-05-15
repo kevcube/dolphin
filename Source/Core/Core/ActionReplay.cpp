@@ -1064,6 +1064,7 @@ namespace ActionReplay
     // Flag which indicates lock-on
     if (PowerPC::HostRead_U8(0x804C3FF3))
     {
+      PowerPC::HostWrite_U32(0, 0x804D7C78);
       return;
     }
 
@@ -1091,9 +1092,6 @@ namespace ActionReplay
     //  Provide the destination vertical angle
     PowerPC::HostWrite_U32(verticalAngle, 0x804D7F3C);
 
-    //  I didn't investigate why, but this has to be 0
-    //  it also has to do with horizontal turning, but is limited to a certain speed
-    PowerPC::HostWrite_U32(0, 0x804d7ca8);
     //  provide the speed to turn horizontally
     PowerPC::HostWrite_U32(horizontalSpeed, 0x804D7C78);
   }
@@ -1203,6 +1201,9 @@ namespace ActionReplay
         c2.ops.push_back(AREntry(0x040992C4, 0x60000000));
         c3.ops.push_back(AREntry(0x04183CFC, 0x60000000));
         c4.ops.push_back(AREntry(0x04183D24, 0x60000000));
+        c4.ops.push_back(AREntry(0x0402ca98, 0x60000000));
+        c4.ops.push_back(AREntry(0x04175568, 0x60000000));
+        c4.ops.push_back(AREntry(0x041768b4, 0x60000000));
         //c5.ops.push_back(AREntry(0x04))
 
 
@@ -1215,7 +1216,7 @@ namespace ActionReplay
   void RunAllActive()
   {
     // Dolphins Stuff
-    //if (!SConfig::GetInstance().bEnableCheats)
+    if (!SConfig::GetInstance().bEnableCheats)
       return;
 
     // need to check which game we're running...
@@ -1228,11 +1229,11 @@ namespace ActionReplay
     static int last_game_running = -1;
     switch (game_sig)
     {
-    case 0x00000090:
+    case 0x90010024:
       game_id = 3;
       region_id = 0;
       break;
-    case 0x00000093:
+    case 0x93FD0008:
       game_id = 3;
       region_id = 1;
       break;
@@ -1345,5 +1346,6 @@ namespace ActionReplay
   }
 
 }  // namespace ActionReplay
+
 
 
