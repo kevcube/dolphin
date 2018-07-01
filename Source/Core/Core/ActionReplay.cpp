@@ -1099,7 +1099,7 @@ namespace ActionReplay
   //*****************************************************************************************
   // Metroid Prime 2
   //*****************************************************************************************
-  void primeTwo()
+  void primeTwo_NTSC()
   {
     // You give yAngle the angle you want to turn to
     static float yAngle = 0;
@@ -1141,6 +1141,38 @@ namespace ActionReplay
     }
   }
 
+  void primeTwo_PAL()
+  {
+    static float yAngle = 0;
+
+    int dx = InputExternal::g_mouse_input.GetDeltaHorizontalAxis(), dy = InputExternal::g_mouse_input.GetDeltaVerticalAxis();
+
+    float vSensitivity = (sensitivity * TURNRATE_RATIO) / (60.0f);
+
+    float dfx = dx * -sensitivity;
+
+    yAngle += (float)dy * -vSensitivity;
+    yAngle = clamp(-1.04f, 1.04f, yAngle);
+
+    u32 baseAddress = PowerPC::HostRead_U32(0x804ee738 + 0x14f4);
+
+    // Modify this, see if we can check game state or something somehow (what writes to baseAddress?)
+    // Makes sure the baaseaddress is within the valid range of memoryaddresses for GamCube/Wii
+    if (baseAddress > 0x80000000 && baseAddress < 0x81800000)
+    {
+      // HorizontalSpeed and Vertical angle to store values, used as buffers for memcpy reference variables
+      u32 horizontalSpeed, verticalAngle;
+
+      // Copying values representing floating point data into integers
+      memcpy(&horizontalSpeed, &dfx, 4);
+      memcpy(&verticalAngle, &yAngle, 4);
+
+      // Write the data to the addresses we want
+      PowerPC::HostWrite_U32(verticalAngle, baseAddress + 0x5f0);
+      PowerPC::HostWrite_U32(horizontalSpeed, baseAddress + 0x178);
+    }
+  }
+
   //*****************************************************************************************
   // Metroid Prime 3
   //*****************************************************************************************
@@ -1159,14 +1191,13 @@ namespace ActionReplay
       if (game == 1)
       {
         ARCode c1, c2, c3, c4, c5;
-        c1.active = c2.active = c3.active = c4.active = c5.active = true;
-        c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = c5.user_defined = true;
+        c1.active = c2.active = c3.active = c4.active = true;
+        c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = true;
 
         c1.ops.push_back(AREntry(0x04098ee4, 0xec010072));
         c2.ops.push_back(AREntry(0x04099138, 0x60000000));
         c3.ops.push_back(AREntry(0x04183a8c, 0x60000000));
         c4.ops.push_back(AREntry(0x04183a64, 0x60000000));
-        //c5.ops.push_back(AREntry(0x04))
 
 
         codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
@@ -1193,21 +1224,34 @@ namespace ActionReplay
     {
       if (game == 1)
       {
-        ARCode c1, c2, c3, c4, c5;
-        c1.active = c2.active = c3.active = c4.active = c5.active = true;
-        c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = c5.user_defined = true;
+        ARCode c1, c2, c3, c4;
+        c1.active = c2.active = c3.active = c4.active = true;
+        c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined;
 
         c1.ops.push_back(AREntry(0x04099068, 0xec010072)); //PAL: 04099068
         c2.ops.push_back(AREntry(0x040992C4, 0x60000000));
         c3.ops.push_back(AREntry(0x04183CFC, 0x60000000));
         c4.ops.push_back(AREntry(0x04183D24, 0x60000000));
-        c4.ops.push_back(AREntry(0x0402ca98, 0x60000000));
-        c4.ops.push_back(AREntry(0x04175568, 0x60000000));
-        c4.ops.push_back(AREntry(0x041768b4, 0x60000000));
-        //c5.ops.push_back(AREntry(0x04))
 
 
         codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
+      }
+      if (game == 2)
+      {
+        ARCode c1, c2, c3, c4, c5, c6, c7;
+        c1.active = c2.active = c3.active = c4.active = c5.active = c6.active = c7.active = true;
+        c1.user_defined = c2.user_defined = c3.user_defined = c4.user_defined = c5.user_defined = c6.user_defined = c7.user_defined = true;
+
+        c1.ops.push_back(AREntry(0x0408e30C, 0xc0430184));
+        c2.ops.push_back(AREntry(0x0408E360, 0x60000000));
+        c3.ops.push_back(AREntry(0x041496E4, 0x60000000));
+        c4.ops.push_back(AREntry(0x0414970C, 0x60000000));
+        c5.ops.push_back(AREntry(0x04137240, 0x60000000));
+        c6.ops.push_back(AREntry(0x0408D18C, 0x60000000));
+        c7.ops.push_back(AREntry(0x0408D15C, 0x60000000));
+
+        codes.push_back(c1); codes.push_back(c2); codes.push_back(c3); codes.push_back(c4);
+        codes.push_back(c5); codes.push_back(c6); codes.push_back(c7);
       }
     }
     ApplyCodes(codes);
@@ -1218,8 +1262,6 @@ namespace ActionReplay
     // Dolphins Stuff
     if (!SConfig::GetInstance().bEnableCheats)
       return;
-
-    // need to check which game we're running...
 
     u32 game_sig = PowerPC::HostRead_Instruction(0x80074000);
 
@@ -1284,11 +1326,11 @@ namespace ActionReplay
       
       if (region_id == 0)
       {
-        primeTwo();
+        primeTwo_NTSC();
       }
       else
       {
-        //primeOne_PAL();
+        primeTwo_PAL();
       }
     }
     else if(game_id == 3)
@@ -1344,6 +1386,7 @@ namespace ActionReplay
   {
     active_game = game;
   }
+
 
 }  // namespace ActionReplay
 
