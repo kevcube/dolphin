@@ -214,19 +214,7 @@ void FpsControls::handle_beam_visor_switch(std::array<int, 4> const &beams,
 }
 
 void FpsControls::run_mod_menu(Game game, Region region) {
-  if (region == Region::NTSC_U) {
-    handle_cursor(0x80913c9c, 0x80913d5c, region);
-  } else if (region == Region::NTSC_J) {
-    if (game == Game::MENU_PRIME_1) {
-      handle_cursor(0x805a7da8, 0x805a7dac, region);
-    }
-    if (game == Game::MENU_PRIME_2) {
-      handle_cursor(0x805a7ba8, 0x805a7bac, region);
-    }
-  } else if (region == Region::PAL) {
-    u32 cursor_address = read32(0x80621ffc);
-    handle_cursor(cursor_address + 0xdc, cursor_address + 0x19c, region);
-  }
+  return;
 }
 
 void FpsControls::run_mod_mp1(Region region) {
@@ -270,22 +258,14 @@ void FpsControls::run_mod_mp1(Region region) {
         if (menu_open == false) {
           set_code_group_state("beam_change", ModState::DISABLED);
         }
-
-        handle_reticle(cursor + 0x9c, cursor + 0x15c, region, GetFov());
         menu_open = true;
       }
-    } else if (HandleReticleLockOn()) {  // If we handle menus, this doesn't need to be ran
-      handle_reticle(cursor + 0x9c, cursor + 0x15c, region, GetFov());
     }
   } else {
     if (menu_open) {
       set_code_group_state("beam_change", ModState::ENABLED);
       menu_open = false;
     }
-
-    set_cursor_pos(0, 0);
-    write32(0, cursor + 0x9c);
-    write32(0, cursor + 0x15c);
 
     calculate_pitch_delta();
     writef32(FpsControls::pitch, firstperson_pitch);
@@ -390,7 +370,6 @@ void FpsControls::run_mod_mp2(Region region) {
   bool locked = (read32(orbit_state) != ORBIT_STATE_GRAPPLE &&
     read8(lockon_state) || beamvisor_menu);
 
-  LOOKUP_DYN(cursor);
   LOOKUP_DYN(angular_momentum);
   if (locked) {
     // Angular velocity (not really, but momentum) is being messed with like mp1
@@ -409,12 +388,8 @@ void FpsControls::run_mod_mp2(Region region) {
         if (menu_open == false) {
           set_code_group_state("beam_change", ModState::DISABLED);
         }
-
-        handle_reticle(cursor + 0x9c, cursor + 0x15c, region, GetFov());
         menu_open = true;
       }
-    } else if (HandleReticleLockOn()) {
-      handle_reticle(cursor + 0x9c, cursor + 0x15c, region, GetFov());
     }
   } else {
     if (menu_open) {
@@ -422,10 +397,6 @@ void FpsControls::run_mod_mp2(Region region) {
 
       menu_open = false;
     }
-
-    set_cursor_pos(0, 0);
-    write32(0, cursor + 0x9c);
-    write32(0, cursor + 0x15c);
 
     calculate_pitch_delta();
     // Grab the arm cannon address, go to its transform field (NOT the
@@ -604,23 +575,10 @@ void FpsControls::run_mod_mp3(Game active_game, Region active_region) {
     set_code_group_state("grapple_lasso", ModState::DISABLED);
     set_code_group_state("grapple_lasso_animation", ModState::DISABLED);
   }
-
-  LOOKUP_DYN(cursor);
-  const auto mp3_handle_cursor = [cursor, active_region] (bool locked, bool for_reticle) {
-    if (locked) {
-      write32(0, cursor + 0x9c);
-      write32(0, cursor + 0x15c);
-    } else if (for_reticle) {
-      handle_reticle(cursor + 0x9c, cursor + 0x15c, active_region, GetFov());
-    } else {
-      handle_cursor(cursor + 0x9c, cursor + 0x15c, active_region);
-    }
-  };
   
   // Handles menu screen cursor
   LOOKUP(cursor_dlg_enabled);
   if (read8(cursor_dlg_enabled)) {
-    mp3_handle_cursor(false, false);
     return;
   }
 
@@ -629,7 +587,6 @@ void FpsControls::run_mod_mp3(Game active_game, Region active_region) {
   LOOKUP(state_manager);
   // I won't add (state_manager + 0x29C) to the address db, not sure what it is
   if (active_region == Region::NTSC_J && read32(state_manager + 0x29C) == 0xffffffff) {
-    mp3_handle_cursor(false, false);
     return;
   }
 
@@ -650,10 +607,8 @@ void FpsControls::run_mod_mp3(Game active_game, Region active_region) {
     // If boss is dead
     if (read8(boss_status) == 8) {
       set_state(ModState::ENABLED);
-      mp3_handle_cursor(true, true);
     } else {
       set_state(ModState::CODE_DISABLED);
-      mp3_handle_cursor(false, true);
       return;
     }
   }
@@ -669,11 +624,6 @@ void FpsControls::run_mod_mp3(Game active_game, Region active_region) {
   if ((read32(lockon_type) == 0 && read8(lockon_state)) || read32(lockon_type) == 1 || beamvisor_menu) {
     write32(0, angular_momentum);
     calculate_pitch_locked(active_game, active_region);
-
-    if (HandleReticleLockOn() || beamvisor_menu) {
-      mp3_handle_cursor(false, true);
-    }
-
     writef32(FpsControls::pitch, firstperson_pitch);
 
     return;
@@ -688,7 +638,6 @@ void FpsControls::run_mod_mp3(Game active_game, Region active_region) {
 
     if (FpsControls::pitch == target_pitch) {
       writef32(target_pitch, pitch);
-      mp3_handle_cursor(false, false);
 
       return;
     }
@@ -699,7 +648,6 @@ void FpsControls::run_mod_mp3(Game active_game, Region active_region) {
     return;
   }
 
-  mp3_handle_cursor(true, true);
   set_cursor_pos(0, 0);
 
   calculate_pitch_delta();
@@ -1409,7 +1357,7 @@ void FpsControls::init_mod_mp1(Region region) {
     add_code_change(0x80183a64, 0x60000000);
     add_code_change(0x8017661c, 0x60000000);
     // Cursor location, sets to f17 (always 0 due to little use)
-    add_code_change(0x802fb5b4, 0xd23f009c);
+    //add_code_change(0x802fb5b4, 0xd23f009c);
     add_code_change(0x8019fbcc, 0x60000000);
 
     add_code_change(0x80075f24, 0x60000000, "beam_menu");
@@ -1426,7 +1374,7 @@ void FpsControls::init_mod_mp1(Region region) {
     add_code_change(0x80183cfc, 0x60000000);
     add_code_change(0x80183d24, 0x60000000);
     add_code_change(0x801768b4, 0x60000000);
-    add_code_change(0x802fb84c, 0xd23f009c);
+    //add_code_change(0x802fb84c, 0xd23f009c);
     add_code_change(0x8019fe64, 0x60000000);
 
     add_code_change(0x80075f74, 0x60000000, "beam_menu");
@@ -1443,7 +1391,7 @@ void FpsControls::init_mod_mp1(Region region) {
     add_code_change(0x8018460c, 0x60000000);
     add_code_change(0x801835e4, 0x60000000);
     add_code_change(0x80176ff0, 0x60000000);
-    add_code_change(0x802fb234, 0xd23f009c);
+    //add_code_change(0x802fb234, 0xd23f009c);
     add_code_change(0x801a074c, 0x60000000);
 
     add_code_change(0x800760a4, 0x60000000, "beam_menu");
@@ -1518,7 +1466,7 @@ void FpsControls::init_mod_mp2(Region region) {
     add_code_change(0x80135b20, 0x60000000);
     add_code_change(0x8008bb48, 0x60000000);
     add_code_change(0x8008bb18, 0x60000000);
-    add_code_change(0x803054a0, 0xd23f009c);
+    //add_code_change(0x803054a0, 0xd23f009c);
     add_code_change(0x80169dbc, 0x60000000);
     add_code_change(0x80143d00, 0x48000050);
 
@@ -1537,7 +1485,7 @@ void FpsControls::init_mod_mp2(Region region) {
     add_code_change(0x80137240, 0x60000000);
     add_code_change(0x8008d18c, 0x60000000);
     add_code_change(0x8008d15c, 0x60000000);
-    add_code_change(0x80307d2c, 0xd23f009c);
+    //add_code_change(0x80307d2c, 0xd23f009c);
     add_code_change(0x8016b534, 0x60000000);
     add_code_change(0x80145474, 0x48000050);
 
@@ -1556,7 +1504,7 @@ void FpsControls::init_mod_mp2(Region region) {
     add_code_change(0x8013511c, 0x60000000);
     add_code_change(0x8008b7c4, 0x60000000);
     add_code_change(0x8008b794, 0x60000000);
-    add_code_change(0x80303ec8, 0xd23f009c);
+    //add_code_change(0x80303ec8, 0xd23f009c);
     add_code_change(0x80169388, 0x60000000);
     add_code_change(0x8014331c, 0x48000050);
 
