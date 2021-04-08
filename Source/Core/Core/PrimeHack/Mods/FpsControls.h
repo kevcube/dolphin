@@ -28,7 +28,7 @@ private:
   void calculate_pitch_to_target(float target_pitch);
   float calculate_yaw_vel();
   void handle_beam_visor_switch(std::array<int, 4> const &beams,
-                                std::array<std::tuple<int, int>, 4> const& visors);
+                                std::array<std::tuple<int, int>, 4> const& visors, int player_index = 0);
   void mp3_handle_lasso(u32 grapple_state_addr);
 
   void run_mod_menu(Game game, Region region);

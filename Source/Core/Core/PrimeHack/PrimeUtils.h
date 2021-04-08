@@ -49,8 +49,8 @@ constexpr u32 gen_vmcall(const u32 call_idx, const u32 param) {
 
 constexpr float kTurnrateRatio = 0.00498665500569808449206349206349f;
 
-int get_beam_switch(std::array<int, 4> const& beams);
-std::tuple<int, int> get_visor_switch(std::array<std::tuple<int, int>, 4> const& visors, bool combat_visor);
+int get_beam_switch(std::array<int, 4> const& beams, int player_index = 0);
+std::tuple<int, int> get_visor_switch(std::array<std::tuple<int, int>, 4> const& visors, bool combat_visor, int player_index = 0);
 
 void handle_cursor(u32 x_address, u32 y_address, Region region);
 void handle_reticle(u32 x_address, u32 y_address, Region region, float fov);

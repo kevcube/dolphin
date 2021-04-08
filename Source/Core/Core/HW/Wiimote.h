@@ -102,30 +102,29 @@ ControllerEmu::ControlGroup* GetTaTaConGroup(int number, WiimoteEmu::TaTaConGrou
 
 void ChangeUIPrimeHack(int number, bool useMetroidUI);
 
-bool CheckVisor(int visor_count);
-bool CheckBeam(int beam_count);
-bool CheckBeamScroll(bool direction);
-bool CheckVisorScroll(bool direction);
-bool CheckSpringBall();
+bool CheckVisor(int visor_count, int player_index = 0);
+bool CheckBeam(int beam_count, int player_index = 0);
+bool CheckBeamScroll(bool direction, int player_index = 0);
+bool CheckVisorScroll(bool direction, int player_index = 0);
+bool CheckSpringBall(int player_index = 0);
 bool CheckImprovedMotions();
-bool CheckForward();
-bool CheckBack();
-bool CheckLeft();
-bool CheckRight();
-bool CheckJump();
+bool CheckForward(int player_index = 0);
+bool CheckBack(int player_index = 0);
+bool CheckLeft(int player_index = 0);
+bool CheckRight(int player_index = 0);
+bool CheckJump(int player_index = 0);
 
 bool CheckGrapple();
 bool UseGrappleTapping();
 bool GrappleCtlBound();
-bool PrimeUseController();
+bool PrimeUseController(int player_index = 0);
 
-bool PrimeUseController();
-bool CheckPitchRecentre();
+bool CheckPitchRecentre(int player_index = 0);
 
-std::tuple<double, double> GetPrimeStickXY();
-std::tuple<bool, bool> GetBVMenuOptions();
+std::tuple<double, double> GetPrimeStickXY(int player_index = 0);
+std::tuple<bool, bool> GetBVMenuOptions(int player_index = 0);
 
-std::tuple<double, double, bool, bool, bool, bool> PrimeSettings();
+std::tuple<double, double, bool, bool, bool, bool> PrimeSettings(int player_index = 0);
 
 
 bool NetPlay_GetButtonPress(int wiimote, bool pressed);

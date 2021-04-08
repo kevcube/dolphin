@@ -31,24 +31,26 @@
 #include "Core/Config/GraphicsSettings.h"
 
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
+#include "InputCommon/InputConfig.h"
 
 #include "VideoCommon/VideoConfig.h"
+#include "Core\HW\GCPadEmu.h"
 
 namespace prime {
 namespace {
-float sensitivity;
-float cursor_sensitivity;
-float camera_fov;
+std::array<float, 4> sensitivity;
+std::array<float, 4> cursor_sensitivity;
+std::array<float, 4> camera_fov;
 
-bool inverted_x = false;
-bool inverted_y = false;
-bool scale_cursor_sens = false;
+std::array<bool, 4> inverted_x = {false, false, false, false};
+std::array<bool, 4> inverted_y = {false, false, false, false};
+std::array<bool, 4> scale_cursor_sens = {false, false, false, false};
 HackManager hack_mgr;
 AddressDB addr_db;
 EmuVariableManager var_mgr;
 bool is_running = false;
 CameraLock lock_camera = CameraLock::Unlocked;
-bool reticle_lock = false;
+std::array<bool, 4> reticle_lock = {false, false, false, false};
 
 std::string pending_modfile = "";
 bool mod_suspended = false;
@@ -91,47 +93,47 @@ void InitializeHack() {
   hack_mgr.enable_mod("elf_mod_loader");
 }
 
-bool CheckBeamCtl(int beam_num) {
+bool CheckBeamCtl(int beam_num, int player_index) {
   return Wiimote::CheckBeam(beam_num);
 }
 
-bool CheckVisorCtl(int visor_num) {
+bool CheckVisorCtl(int visor_num, int player_index) {
   return Wiimote::CheckVisor(visor_num);
 }
 
-bool CheckVisorScrollCtl(bool direction) {
+bool CheckVisorScrollCtl(bool direction, int player_index) {
   return Wiimote::CheckVisorScroll(direction);
 }
 
-bool CheckBeamScrollCtl(bool direction) {
+bool CheckBeamScrollCtl(bool direction, int player_index) {
   return Wiimote::CheckBeamScroll(direction);
 }
 
-bool CheckSpringBallCtl() {
-  return Wiimote::CheckSpringBall();
+bool CheckSpringBallCtl(int player_index) {
+  return Wiimote::CheckSpringBall(player_index);
 }
 
 bool ImprovedMotionControls() {
   return Wiimote::CheckImprovedMotions();
 }
   
-bool CheckForward() {
+bool CheckForward(int player_index) {
   return Wiimote::CheckForward();
 }
 
-bool CheckBack() {
+bool CheckBack(int player_index) {
   return Wiimote::CheckBack();
 }
 
-bool CheckLeft() {
+bool CheckLeft(int player_index) {
   return Wiimote::CheckLeft();
 }
 
-bool CheckRight() {
+bool CheckRight(int player_index) {
   return Wiimote::CheckRight();
 }
 
-bool CheckJump() {
+bool CheckJump(int player_index) {
   return Wiimote::CheckJump();
 }
 
@@ -211,113 +213,114 @@ std::tuple<float, float, float> GetArmXYZ() {
   return std::make_tuple(x, y, z);
 }
 
-void UpdateHackSettings() {
+void UpdateHackSettings(int player_index) {
   double camera, cursor;
   bool invertx, inverty, scale_sens = false, lock = false;
 
-  if (hack_mgr.get_active_game() >= Game::PRIME_1_GCN)
-    std::tie<double, double, bool, bool>(camera, cursor, invertx, inverty) =
-      Pad::PrimeSettings();
-  else
-    std::tie<double, double, bool, bool, bool>(camera, cursor, invertx, inverty, scale_sens, lock) =
-      Wiimote::PrimeSettings();
+  if (hack_mgr.get_active_game() >= Game::PRIME_1_GCN) {
+    std::tie(camera, cursor, invertx, inverty) =
+      static_cast<GCPad*>(Pad::GetConfig()->GetController(player_index))->GetPrimeSettings();
+  } else {
+    std::tie(camera, cursor, invertx, inverty, scale_sens, lock) =
+      static_cast<WiimoteEmu::Wiimote*>(Wiimote::GetConfig()->GetController(player_index))->GetPrimeSettings();
+  }
 
-  SetSensitivity((float)camera);
-  SetCursorSensitivity((float)cursor);
-  SetInvertedX(invertx);
-  SetInvertedY(inverty);
-  SetScaleCursorSensitivity(scale_sens);
-  SetReticleLock(lock);
+  SetSensitivity((float)camera, player_index);
+  SetCursorSensitivity((float)cursor, player_index);
+  SetInvertedX(invertx, player_index);
+  SetInvertedY(inverty, player_index);
+  SetScaleCursorSensitivity(scale_sens, player_index);
+  SetReticleLock(lock, player_index);
 }
 
-float GetSensitivity() {
-  return sensitivity;
+float GetSensitivity(int player_index) {
+  return sensitivity[player_index];
 }
 
-void SetSensitivity(float sens) {
-  sensitivity = sens;
+void SetSensitivity(float sens, int player_index) {
+  sensitivity[player_index] = sens;
 }
 
-bool HandleReticleLockOn()
+bool HandleReticleLockOn(int player_index)
 {
-  return reticle_lock;
+  return reticle_lock[player_index];
 }
 
-void SetReticleLock(bool lock)
+void SetReticleLock(bool lock, int player_index)
 {
-  reticle_lock = lock;
+  reticle_lock[player_index] = lock;
 }
 
-float GetCursorSensitivity() {
-  return cursor_sensitivity;
+float GetCursorSensitivity(int player_index) {
+  return cursor_sensitivity[player_index];
 }
 
-void SetCursorSensitivity(float sens) {
-  cursor_sensitivity = sens;
+void SetCursorSensitivity(float sens, int player_index) {
+  cursor_sensitivity[player_index] = sens;
 }
 
 float GetFov() {
   return Config::Get(Config::FOV);
 }
 
-bool InvertedY() {
-  return inverted_y;
+bool InvertedY(int player_index) {
+  return inverted_y[player_index];
 }
 
-void SetInvertedY(bool inverted) {
-  inverted_y = inverted;
+void SetInvertedY(bool inverted, int player_index) {
+  inverted_y[player_index] = inverted;
 }
 
-bool InvertedX() {
-  return inverted_x;
+bool InvertedX(int player_index) {
+  return inverted_x[player_index];
 }
 
-void SetInvertedX(bool inverted) {
-  inverted_x = inverted;
+void SetInvertedX(bool inverted, int player_index) {
+  inverted_x[player_index] = inverted;
 }
 
-bool ScaleCursorSensitivity() {
-  return scale_cursor_sens;
+bool ScaleCursorSensitivity(int player_index) {
+  return scale_cursor_sens[player_index];
 }
 
-void SetScaleCursorSensitivity(bool scale) {
-  scale_cursor_sens = scale;
+void SetScaleCursorSensitivity(bool scale, int player_index) {
+  scale_cursor_sens[player_index] = scale;
 }
 
-bool CheckPitchRecentre() {
+bool CheckPitchRecentre(int player_index) {
   if (hack_mgr.get_active_game() >= Game::PRIME_1_GCN) {
     if (Pad::PrimeUseController()) {
       return Pad::CheckPitchRecentre();
     } 
   }
   else if (Wiimote::PrimeUseController()) {
-    return Wiimote::CheckPitchRecentre();
+    return Wiimote::CheckPitchRecentre(player_index);
   }
 
   return false;
 }
 
-double GetHorizontalAxis() {
+double GetHorizontalAxis(int player_index) {
   if (hack_mgr.get_active_game() >= Game::PRIME_1_GCN) {
     if (Pad::PrimeUseController()) {
       return std::get<0>(Pad::GetPrimeStickXY());
     } 
   }
   else if (Wiimote::PrimeUseController()) {
-    return std::get<0>(Wiimote::GetPrimeStickXY());
+    return std::get<0>(Wiimote::GetPrimeStickXY(player_index));
   } 
   
   return static_cast<double>(g_mouse_input->GetDeltaHorizontalAxis());
 }
 
-double GetVerticalAxis() {
+double GetVerticalAxis(int player_index) {
   if (hack_mgr.get_active_game() >= Game::PRIME_1_GCN) {
     if (Pad::PrimeUseController()) {
       return std::get<1>(Pad::GetPrimeStickXY());
     } 
   }
   else if (Wiimote::PrimeUseController()) {
-    return std::get<1>(Wiimote::GetPrimeStickXY());
+    return std::get<1>(Wiimote::GetPrimeStickXY(player_index));
   } 
 
   return static_cast<double>(g_mouse_input->GetDeltaVerticalAxis());

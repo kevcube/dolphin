@@ -25,8 +25,8 @@ namespace prime
 */
 
 static float cursor_x = 0, cursor_y = 0;
-static int current_beam = 0;
-static int current_visor = 0;
+static std::array<int, 4> current_beam = {0, 0, 0, 0};
+static std::array<int, 4> current_visor = {0, 0, 0, 0};
 static std::array<bool, 4> beam_owned = {false, false, false, false};
 static std::array<bool, 4> visor_owned = {false, false, false, false};
 static bool noclip_enabled = false;
@@ -103,9 +103,9 @@ void write_invalidate(u32 address, u32 value) {
   PowerPC::ScheduleInvalidateCacheThreadSafe(address);
 }
 
-std::tuple<int, int> get_visor_switch(std::array<std::tuple<int, int>, 4> const& visors, bool combat_visor) {
+std::tuple<int, int> get_visor_switch(std::array<std::tuple<int, int>, 4> const& visors, bool combat_visor, int player_index) {
   static bool pressing_button = false;
-  if (CheckVisorCtl(0)) {
+  if (CheckVisorCtl(0, player_index)) {
     if (!combat_visor) {
       if (!pressing_button) {
         pressing_button = true;
@@ -116,40 +116,40 @@ std::tuple<int, int> get_visor_switch(std::array<std::tuple<int, int>, 4> const&
       }
     }
   }
-  if (CheckVisorCtl(1)) {
+  if (CheckVisorCtl(1, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
       return visors[1];
     }
   }
-  else if (CheckVisorCtl(2)) {
+  else if (CheckVisorCtl(2, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
       return visors[2];
     }
   }
-  else if (CheckVisorCtl(3)) {
+  else if (CheckVisorCtl(3, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
       return visors[3];
     }
   }
-  else if (CheckVisorScrollCtl(true)) {
+  else if (CheckVisorScrollCtl(true, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
       for (int i = 0; i < 4; i++) {
-        if (visor_owned[current_visor = (current_visor + 1) % 4]) break;
+        if (visor_owned[current_visor[player_index] = (current_visor[player_index] + 1) % 4]) break;
       }
-      return visors[current_visor];
+      return visors[current_visor[player_index]];
     }
   }
-  else if (CheckVisorScrollCtl(false)) {
+  else if (CheckVisorScrollCtl(false, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
       for (int i = 0; i < 4; i++) {
-        if (visor_owned[current_visor = (current_visor + 3) % 4]) break;
+        if (visor_owned[current_visor[player_index] = (current_visor[player_index] + 3) % 4]) break;
       }
-      return visors[current_visor];
+      return visors[current_visor[player_index]];
     }
   }
   else {
@@ -158,48 +158,48 @@ std::tuple<int, int> get_visor_switch(std::array<std::tuple<int, int>, 4> const&
   return std::make_tuple(-1, 0);
 }
 
-int get_beam_switch(std::array<int, 4> const& beams) {
+int get_beam_switch(std::array<int, 4> const& beams, int player_index) {
   static bool pressing_button = false;
-  if (CheckBeamCtl(0)) {
+  if (CheckBeamCtl(0, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
-      return current_beam = beams[0];
+      return current_beam[player_index] = beams[0];
     }
   }
-  else if (CheckBeamCtl(1)) {
+  else if (CheckBeamCtl(1, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
-      return current_beam = beams[1];
+      return current_beam[player_index] = beams[1];
     }
   }
-  else if (CheckBeamCtl(2)) {
+  else if (CheckBeamCtl(2, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
-      return current_beam = beams[2];
+      return current_beam[player_index] = beams[2];
     }
   }
-  else if (CheckBeamCtl(3)) {
+  else if (CheckBeamCtl(3, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
-      return current_beam = beams[3];
+      return current_beam[player_index] = beams[3];
     }
   }
-  else if (CheckBeamScrollCtl(true)) {
+  else if (CheckBeamScrollCtl(true, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
       for (int i = 0; i < 4; i++) {
-        if (beam_owned[current_beam = (current_beam + 1) % 4]) break;
+        if (beam_owned[current_beam[player_index] = (current_beam[player_index] + 1) % 4]) break;
       }
-      return beams[current_beam];
+      return beams[current_beam[player_index]];
     }
   }
-  else if (CheckBeamScrollCtl(false)) {
+  else if (CheckBeamScrollCtl(false, player_index)) {
     if (!pressing_button) {
       pressing_button = true;
       for (int i = 0; i < 4; i++) {
-        if (beam_owned[current_beam = (current_beam + 3) % 4]) break;
+        if (beam_owned[current_beam[player_index] = (current_beam[player_index] + 3) % 4]) break;
       }
-      return beams[current_beam];
+      return beams[current_beam[player_index]];
     }
   }
   else {

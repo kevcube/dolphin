@@ -169,7 +169,7 @@ float FpsControls::calculate_yaw_vel() {
 }
 
 void FpsControls::handle_beam_visor_switch(std::array<int, 4> const &beams,
-  std::array<std::tuple<int, int>, 4> const &visors) {
+  std::array<std::tuple<int, int>, 4> const &visors, int player_index) {
   // Global array of all powerups (measured in "ammunition"
   // even for things like visors/beams)
   LOOKUP_DYN(powerups_array);
@@ -192,7 +192,7 @@ void FpsControls::handle_beam_visor_switch(std::array<int, 4> const &beams,
   }
 
   if (has_beams) {
-    const int beam_id = get_beam_switch(beams);
+    const int beam_id = get_beam_switch(beams, player_index);
     if (beam_id != -1) {
       prime::GetVariableManager()->set_variable("new_beam", static_cast<u32>(beam_id));
       prime::GetVariableManager()->set_variable("beamchange_flag", u32{1});
@@ -202,7 +202,7 @@ void FpsControls::handle_beam_visor_switch(std::array<int, 4> const &beams,
   LOOKUP_DYN(active_visor);
   int visor_id, visor_off;
   std::tie(visor_id, visor_off) = get_visor_switch(visors,
-    read32(active_visor) == 0);
+    read32(active_visor) == 0, player_index);
 
   if (visor_id != -1) {
     if (read32(powerups_array + (visor_off * powerups_size) + powerups_offset)) {
@@ -367,6 +367,8 @@ void FpsControls::run_mod_mp2(Region region) {
 
   // VERY similar to mp1, this time CPlayer isn't TOneStatic (presumably because
   // of multiplayer mode in the GCN version?)
+  int player_index = 0;
+
   LOOKUP_DYN(player);
   if (player == 0) {
     return;
@@ -378,7 +380,7 @@ void FpsControls::run_mod_mp2(Region region) {
     return;
   }
 
-  handle_beam_visor_switch(prime_two_beams, prime_two_visors);
+  handle_beam_visor_switch(prime_two_beams, prime_two_visors, player_index);
 
   // Is beam/visor menu showing on screen
   LOOKUP_DYN(beamvisor_menu_state);

@@ -13,17 +13,17 @@
 namespace prime {
 void InitializeHack();
 
-bool CheckBeamCtl(int beam_num);
-bool CheckVisorCtl(int visor_num);
-bool CheckBeamScrollCtl(bool direction);
-bool CheckVisorScrollCtl(bool direction);
-bool CheckSpringBallCtl();
+bool CheckBeamCtl(int beam_num, int player_index = 0);
+bool CheckVisorCtl(int visor_num, int player_index = 0);
+bool CheckBeamScrollCtl(bool direction, int player_index = 0);
+bool CheckVisorScrollCtl(bool direction, int player_index = 0);
+bool CheckSpringBallCtl(int player_index = 0);
 bool ImprovedMotionControls();
-bool CheckForward();
-bool CheckBack();
-bool CheckLeft();
-bool CheckRight();
-bool CheckJump();
+bool CheckForward(int player_index = 0);
+bool CheckBack(int player_index = 0);
+bool CheckLeft(int player_index = 0);
+bool CheckRight(int player_index = 0);
+bool CheckJump(int player_index = 0);
 
 bool CheckGrappleCtl();
 bool GrappleTappingMode();
@@ -48,33 +48,33 @@ bool GetAutoArmAdjust();
 bool GetToggleArmAdjust();
 std::tuple<float, float, float> GetArmXYZ();
 
-void UpdateHackSettings();
+void UpdateHackSettings(int player_index = 0);
 
-float GetSensitivity();
-void SetSensitivity(float sensitivity);
-float GetCursorSensitivity();
-void SetCursorSensitivity(float sensitivity);
-bool ScaleCursorSensitivity();
-void SetScaleCursorSensitivity(bool scale);
+float GetSensitivity(int player_index = 0);
+void SetSensitivity(float sensitivity, int player_index = 0);
+float GetCursorSensitivity(int player_index = 0);
+void SetCursorSensitivity(float sensitivity, int player_index = 0);
+bool ScaleCursorSensitivity(int player_index = 0);
+void SetScaleCursorSensitivity(bool scale, int player_index = 0);
 float GetFov();
-bool InvertedY();
-void SetInvertedY(bool inverted);
-bool InvertedX();
-void SetInvertedX(bool inverted);
+bool InvertedY(int player_index = 0);
+void SetInvertedY(bool inverted, int player_index = 0);
+bool InvertedX(int player_index = 0);
+void SetInvertedX(bool inverted, int player_index = 0);
 bool GetCulling();
 
-bool HandleReticleLockOn();
-void SetReticleLock(bool lock);
+bool HandleReticleLockOn(int player_index = 0);
+void SetReticleLock(bool lock, int player_index = 0);
 
 enum CameraLock { Centre, Angle45, Unlocked };
 
 void SetLockCamera(CameraLock lock);
 CameraLock GetLockCamera();
 
-bool CheckPitchRecentre();
+bool CheckPitchRecentre(int player_index = 0);
 
-double GetHorizontalAxis();
-double GetVerticalAxis();
+double GetHorizontalAxis(int player_index = 0);
+double GetVerticalAxis(int player_index = 0);
 
 std::tuple<bool, bool> GetMenuOptions();
 
