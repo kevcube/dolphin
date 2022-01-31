@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.10)
 # MacOS prior to 10.14 did not support aligned alloc which is used to implement
 # std::unique_ptr in the arm64 C++ standard library. x86_64 builds can override
 # this to 10.13.0 using -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13.0" without issue.
-# This is done in the universal binary building script to build a binary that 
+# This is done in the universal binary building script to build a binary that
 # runs on 10.13 on x86_64 computers, while still containing an arm64 slice.
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.14.0" CACHE STRING "")
@@ -73,7 +73,7 @@ endif()
 
 if(APPLE)
   option(MACOS_USE_DEFAULT_SEARCH_PATH "Don't prioritize system library paths" OFF)
-  option(SKIP_POSTPROCESS_BUNDLE "Skip postprocessing bundle for redistributability" OFF) 
+  option(SKIP_POSTPROCESS_BUNDLE "Skip postprocessing bundle for redistributability" OFF)
   # Enable adhoc code signing by default (otherwise makefile builds on ARM will not work)
   option(MACOS_CODE_SIGNING "Enable codesigning" ON)
   set(MACOS_CODE_SIGNING_IDENTITY "-" CACHE STRING "The identity used for codesigning.")
@@ -485,7 +485,7 @@ if(ENCODE_FRAMEDUMPS)
   endif()
   find_package(FFmpeg COMPONENTS avcodec avformat avutil swresample swscale)
   if(FFmpeg_FOUND)
-    if(APPLE) 
+    if(APPLE)
       find_library(COREMEDIA_LIBRARY CoreMedia)
       find_library(VIDEOTOOLBOX_LIBRARY VideoToolbox)
       find_library(COREVIDEO_LIBRARY CoreVideo)
@@ -560,14 +560,9 @@ if (_M_X86)
 endif()
 add_subdirectory(Externals/cpp-optparse)
 
-find_package(fmt 7.1)
-if(fmt_FOUND)
-  message(STATUS "Using shared fmt ${fmt_VERSION}")
-else()
-  check_vendoring_approved(fmt)
-  message(STATUS "Using static fmt from Externals")
-  add_subdirectory(Externals/fmt EXCLUDE_FROM_ALL)
-endif()
+check_vendoring_approved(fmt)
+message(STATUS "Using static fmt from Externals")
+add_subdirectory(Externals/fmt EXCLUDE_FROM_ALL)
 add_subdirectory(Externals/imgui)
 add_subdirectory(Externals/glslang)
 

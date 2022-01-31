@@ -130,7 +130,7 @@ void IPC_HLE_UpdateCallback(u64 userdata, s64 cyclesLate)
 void VICallback(u64 userdata, s64 cyclesLate)
 {
   VideoInterface::Update(CoreTiming::GetTicks() - cyclesLate);
-  CoreTiming::ScheduleEvent(VideoInterface::GetTicksPerHalfLine() - cyclesLate, et_VI);
+  CoreTiming::ScheduleEvent((VideoInterface::GetTicksPerHalfLine() / 2) - cyclesLate, et_VI);
 }
 
 void DecrementerCallback(u64 userdata, s64 cyclesLate)
@@ -143,7 +143,7 @@ void PatchEngineCallback(u64 userdata, s64 cycles_late)
 {
   // We have 2 periods, a 1000 cycle error period and the VI period.
   // We have to carefully combine these together so that we stay on the VI period without drifting.
-  u32 vi_interval = VideoInterface::GetTicksPerField();
+  u32 vi_interval = VideoInterface::GetTicksPerField() / 2;
   s64 cycles_pruned = (userdata + cycles_late) % vi_interval;
   s64 next_schedule = 0;
 
