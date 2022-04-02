@@ -124,6 +124,7 @@ void ElfModLoader::run_mod(Game game, Region region) {
   switch (game) {
   case Game::PRIME_1_GCN:
   case Game::PRIME_2_GCN:
+  case Game::PRIME_2:
     update_bat_regs();
     
     if (region != Region::NTSC_U) {
@@ -175,7 +176,7 @@ void ElfModLoader::run_mod(Game game, Region region) {
 }
 
 bool ElfModLoader::init_mod(Game game, Region region) {
-  if ((game == Game::PRIME_1_GCN || game == Game::PRIME_2_GCN) && region == Region::NTSC_U) {
+  if ((game == Game::PRIME_1_GCN || game == Game::PRIME_2_GCN || game == Game::PRIME_2) && region == Region::NTSC_U) {
     update_bat_regs();
   }
 
